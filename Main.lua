@@ -62,6 +62,10 @@ local Config = {
 	SpeedValue = 50,
 	InfJump = false,
 	IntroEnabled = true,
+	BodyBagESP = false,
+	BodyBagOwner = true,
+	BodyBagDistance = true,
+	BodyBagMaxDist = 5000,
 }
 
 local DEFAULT_SPEED = 16
@@ -584,11 +588,12 @@ local function createMenu()
 		return p
 	end
 
-	makeTab("ESP", 1, 112)
-	makeTab("Players", 2, 112)
-	makeTab("Movement", 3, 112)
-	makeTab("Settings", 4, 112)
-	makeTab("Aimbot", 5, 112)
+	makeTab("ESP", 1, 92)
+	makeTab("Players", 2, 92)
+	makeTab("Movement", 3, 92)
+	makeTab("Farm", 4, 92)
+	makeTab("Settings", 5, 92)
+	makeTab("Aimbot", 6, 92)
 
 	pages["ESP"].Visible = true
 	tabs["ESP"].BackgroundColor3 = THEME.ACCENT
@@ -926,6 +931,12 @@ local function createMenu()
 		saveCfgDelayed()
 	end)
 
+	local farmPage = pages["Farm"]
+	makeToggle(farmPage, "Enable BodyBag ESP", 0, "BodyBagESP")
+	makeToggle(farmPage, "Show Owner", 44, "BodyBagOwner")
+	makeToggle(farmPage, "Show Distance", 88, "BodyBagDistance")
+	makeSlider(farmPage, "Max Distance", 138, 1, 10000, "BodyBagMaxDist", "m")
+
 	local setPage = pages["Settings"]
 	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
 
@@ -1035,6 +1046,10 @@ local function createMenu()
 		Config.SpeedValue = 50
 		Config.InfJump = false
 		Config.IntroEnabled = true
+		Config.BodyBagESP = false
+		Config.BodyBagOwner = true
+		Config.BodyBagDistance = true
+		Config.BodyBagMaxDist = 5000
 		saveCfg()
 	end)
 
@@ -1441,7 +1456,8 @@ local function createESP(plr)
 	hpLbl.TextColor3 = Color3.fromRGB(0, 255, 80)
 	hpLbl.Font = Enum.Font.GothamBold
 	hpLbl.TextSize = 16
-	hpLbl.TextStrokeTransparency = 0	hpLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+	hpLbl.TextStrokeTransparency = 0
+	hpLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
 
 	local distLbl = Instance.new("TextLabel", bb)
 	distLbl.Size = UDim2.new(1, 0, 0, 22)
@@ -1496,6 +1512,178 @@ end)
 for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 
 Players.PlayerRemoving:Connect(removeESP)
+
+local bodyBagObjects = {}
+
+local function isBodyBag(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	local n = string.lower(inst.Name)
+	return string.find(n, "bodybag", 1, true) ~= nil
+end
+
+local function getOwnerName(inst)
+	local nameAttr = inst:GetAttribute("PlayerName")
+	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
+		return nameAttr
+	end
+	nameAttr = inst:GetAttribute("playerName")
+	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
+		return nameAttr
+	end
+	nameAttr = inst:GetAttribute("Owner")
+	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
+		return nameAttr
+	end
+
+	for _, d in ipairs(inst:GetDescendants()) do
+		if d:IsA("StringValue") then
+			local dn = string.lower(d.Name)
+			if dn == "playername" or dn == "owner" or dn == "player" or dn == "username" then
+				if d.Value ~= "" then return d.Value end
+			end
+		end
+		if d:IsA("ObjectValue") then
+			local dn = string.lower(d.Name)
+			if dn == "playername" or dn == "owner" or dn == "player" then
+				if d.Value then return d.Value.Name end
+			end
+		end
+	end
+
+	for _, d in ipairs(inst:GetDescendants()) do
+		if d:IsA("StringValue") and d.Value ~= "" then
+			return d.Value
+		end
+	end
+
+	return nil
+end
+
+local function getBodyBagPosition(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary.Position end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp.Position end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso.Position end
+	local head = inst:FindFirstChild("Head")
+	if head then return head.Position end
+	local part = inst:FindFirstChildWhichIsA("BasePart")
+	if part then return part.Position end
+	return nil
+end
+
+local function getBodyBagAdornee(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp end
+	local head = inst:FindFirstChild("Head")
+	if head then return head end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso end
+	return inst:FindFirstChildWhichIsA("BasePart")
+end
+
+local function createBodyBagESP(inst)
+	if bodyBagObjects[inst] then return end
+	if not isBodyBag(inst) then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_BodyBag"
+	bb.Size = UDim2.new(0, 200, 0, 50)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local ownerLbl = Instance.new("TextLabel", bb)
+	ownerLbl.Size = UDim2.new(1, 0, 0, 22)
+	ownerLbl.Position = UDim2.new(0, 0, 0, 0)
+	ownerLbl.BackgroundTransparency = 1
+	ownerLbl.Text = ""
+	ownerLbl.TextColor3 = Color3.fromRGB(255, 90, 200)
+	ownerLbl.Font = Enum.Font.GothamBold
+	ownerLbl.TextSize = 15
+	ownerLbl.TextStrokeTransparency = 0
+	ownerLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 18)
+	distLbl.Position = UDim2.new(0, 0, 0, 24)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Color3.fromRGB(190, 60, 255)
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 14
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_BodyBagHL"
+	highlight.FillColor = Color3.fromRGB(255, 90, 200)
+	highlight.OutlineColor = Color3.fromRGB(190, 60, 255)
+	highlight.FillTransparency = 0.6
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.Adornee = nil
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	bodyBagObjects[inst] = {
+		bb = bb,
+		ownerLbl = ownerLbl,
+		distLbl = distLbl,
+		highlight = highlight,
+		cachedOwner = nil,
+		lastOwnerCheck = 0,
+	}
+end
+
+local function removeBodyBagESP(inst)
+	if bodyBagObjects[inst] then
+		pcall(function() bodyBagObjects[inst].bb:Destroy() end)
+		pcall(function() bodyBagObjects[inst].highlight:Destroy() end)
+		bodyBagObjects[inst] = nil
+	end
+end
+
+local function scanBodyBags()
+	for _, inst in ipairs(workspace:GetDescendants()) do
+		if isBodyBag(inst) then
+			createBodyBagESP(inst)
+		end
+	end
+end
+
+scanBodyBags()
+
+workspace.DescendantAdded:Connect(function(inst)
+	if isBodyBag(inst) then
+		createBodyBagESP(inst)
+	end
+end)
+
+workspace.DescendantRemoving:Connect(function(inst)
+	if bodyBagObjects[inst] then
+		removeBodyBagESP(inst)
+	end
+end)
+
+task.spawn(function()
+	while _G.QVIZI_LOADED do
+		task.wait(0.5)
+		scanBodyBags()
+	end
+end)
+
+registerCleanup(function()
+	for inst, _ in pairs(bodyBagObjects) do
+		removeBodyBagESP(inst)
+	end
+end)
 
 local function isVisible(targetChar)
 	if not targetChar then return false end
@@ -1634,6 +1822,58 @@ local renderConn = RunService.RenderStepped:Connect(function()
 				else
 					objs.highlight.Enabled = false
 				end
+			else
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
+	for inst, objs in pairs(bodyBagObjects) do
+		if not inst.Parent then
+			removeBodyBagESP(inst)
+			continue
+		end
+
+		local pos = getBodyBagPosition(inst)
+		local adornee = getBodyBagAdornee(inst)
+
+		if Config.BodyBagESP and pos and adornee then
+			local distance = (Camera.CFrame.Position - pos).Magnitude
+			if distance <= Config.BodyBagMaxDist then
+				objs.bb.Adornee = adornee
+				objs.bb.Enabled = true
+
+				if Config.BodyBagOwner then
+					local now = tick()
+					if now - objs.lastOwnerCheck > 2 or not objs.cachedOwner then
+						objs.cachedOwner = getOwnerName(inst)
+						objs.lastOwnerCheck = now
+					end
+					objs.ownerLbl.Visible = true
+					if objs.cachedOwner then
+						objs.ownerLbl.Text = objs.cachedOwner
+					else
+						objs.ownerLbl.Text = "BodyBag"
+					end
+				else
+					objs.ownerLbl.Visible = false
+				end
+
+				if Config.BodyBagDistance then
+					objs.distLbl.Visible = true
+					objs.distLbl.Text = string.format("%dm", math.floor(distance))
+				else
+					objs.distLbl.Visible = false
+				end
+
+				objs.highlight.Adornee = inst
+				objs.highlight.Enabled = true
+				objs.highlight.FillColor = Color3.fromRGB(255, 90, 200)
+				objs.highlight.OutlineColor = Color3.fromRGB(190, 60, 255)
 			else
 				objs.bb.Enabled = false
 				objs.highlight.Enabled = false
