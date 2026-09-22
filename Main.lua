@@ -15,14 +15,18 @@ if _G.QVIZI_LOADED then
 		if _G.QVIZI_CLEANUP then _G.QVIZI_CLEANUP() end
 	end)
 	for _, g in ipairs(LP.PlayerGui:GetChildren()) do
-		if g.Name == "QVIZIHUB" or g.Name == "QVIZI_FOV" or g.Name == "QVIZIIntro" then
+		if g.Name == "QVIZIHUB" or g.Name == "QVIZI_FOV" or g.Name == "QVIZIIntro" or g.Name == "QVIZI_KEY" then
 			g:Destroy()
 		end
 	end
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.4"
+local VERSION = "V1.7"
+
+local KEYS_URL = "https://raw.githubusercontent.com/mokotikDEV0/qvizi-keys/refs/heads/main/keys.json"
+local KEY_FILE = "qvizi_key.txt"
+local SKIP_IF_SAVED = true
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
@@ -69,11 +73,6 @@ local Config = {
 	BodyBagMaxDist = 5000,
 	BodyBagColor = Color3.fromRGB(255, 90, 200),
 	BodyBagUseCustom = false,
-	SleeperESP = false,
-	SleeperDistance = true,
-	SleeperMaxDist = 5000,
-	SleeperColor = Color3.fromRGB(180, 180, 190),
-	SleeperUseCustom = false,
 	BaseClaimESP = false,
 	BaseClaimDistance = true,
 	BaseClaimMaxDist = 5000,
@@ -123,7 +122,6 @@ end
 local COLOR_KEYS = {
 	ESPColor = true,
 	BodyBagColor = true,
-	SleeperColor = true,
 	BaseClaimColor = true,
 	WoodenCrateColor = true,
 }
@@ -187,6 +185,17 @@ local function playClick()
 	end)
 end
 
+local function playSound(id, vol)
+	local s = Instance.new("Sound")
+	s.SoundId = id
+	s.Volume = vol or 0.5
+	s.Parent = SoundService
+	s:Play()
+	task.delay(3, function()
+		pcall(function() s:Destroy() end)
+	end)
+end
+
 local cleanupFns = {}
 _G.QVIZI_CLEANUP = function()
 	for _, fn in ipairs(cleanupFns) do
@@ -199,14 +208,213 @@ local function registerCleanup(fn)
 	table.insert(cleanupFns, fn)
 end
 
-_G.QVIZI_START_BB_SCAN = nil
-_G.QVIZI_CLEAR_BB = nil
-_G.QVIZI_START_SL_SCAN = nil
-_G.QVIZI_CLEAR_SL = nil
-_G.QVIZI_START_BC_SCAN = nil
-_G.QVIZI_CLEAR_BC = nil
-_G.QVIZI_START_WC_SCAN = nil
-_G.QVIZI_CLEAR_WC = nil
+local function saveKey(key)
+	if hasFs() then
+		pcall(writefile, KEY_FILE, key)
+	end
+end
+
+local function loadSavedKey()
+	if not hasFs() then return nil end
+	local ok, key = pcall(function()
+		if isfile(KEY_FILE) then
+			return readfile(KEY_FILE)
+		end
+		return nil
+	end)
+	if ok and type(key) == "string" and key ~= "" then
+		return key
+	end
+	return nil
+end
+
+local function fetchKeys()
+	local ok, res = pcall(function()
+		return HttpService:GetAsync(KEYS_URL .. "?t=" .. tostring(os.time()), true)
+	end)
+	if not ok then return nil, "Server unreachable" end
+	local ok2, data = pcall(HttpService.JSONDecode, HttpService, res)
+	if not ok2 or type(data) ~= "table" then return nil, "Bad format" end
+	return data
+end
+
+local function checkKeyRemote(key)
+	local keys, err = fetchKeys()
+	if not keys then return false, err or "Cannot fetch keys" end
+	local info = keys[key]
+	if not info then return false, "Key not found / revoked" end
+	local exp = tonumber(info.expires) or 0
+	if os.time() > exp then
+		return false, "Key expired"
+	end
+	return true, exp, info.note
+end
+
+local function showKeyGUI()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "QVIZI_KEY"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 99999
+	gui.Parent = LP:WaitForChild("PlayerGui")
+
+	local bg = Instance.new("Frame", gui)
+	bg.Size = UDim2.new(1, 0, 1, 0)
+	bg.BackgroundColor3 = Color3.fromRGB(10, 5, 16)
+	bg.BorderSizePixel = 0
+
+	local glow = Instance.new("Frame", bg)
+	glow.Size = UDim2.new(1, 0, 1, 0)
+	glow.BackgroundColor3 = THEME.ACCENT
+	glow.BackgroundTransparency = 0.94
+	glow.BorderSizePixel = 0
+
+	local box = Instance.new("Frame", bg)
+	box.Size = UDim2.new(0, 440, 0, 260)
+	box.Position = UDim2.new(0.5, -220, 0.5, -130)
+	box.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
+	box.BorderSizePixel = 0
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 16)
+	local stroke = Instance.new("UIStroke", box)
+	stroke.Thickness = 1.5
+	stroke.Color = THEME.ACCENT
+
+	local title = Instance.new("TextLabel", box)
+	title.Size = UDim2.new(1, 0, 0, 36)
+	title.Position = UDim2.new(0, 0, 0, 20)
+	title.BackgroundTransparency = 1
+	title.Text = "QVIZI HUB"
+	title.TextColor3 = THEME.ACCENT
+	title.Font = Enum.Font.GothamBlack
+	title.TextSize = 26
+
+	local subtitle = Instance.new("TextLabel", box)
+	subtitle.Size = UDim2.new(1, 0, 0, 20)
+	subtitle.Position = UDim2.new(0, 0, 0, 52)
+	subtitle.BackgroundTransparency = 1
+	subtitle.Text = "Enter your key to continue"
+	subtitle.TextColor3 = THEME.TEXT_DIM
+	subtitle.Font = Enum.Font.Gotham
+	subtitle.TextSize = 13
+
+	local input = Instance.new("TextBox", box)
+	input.Size = UDim2.new(1, -40, 0, 42)
+	input.Position = UDim2.new(0, 20, 0, 88)
+	input.BackgroundColor3 = Color3.fromRGB(28, 14, 40)
+	input.BorderSizePixel = 0
+	input.PlaceholderText = "QVIZI-XXX-XXXXX"
+	input.PlaceholderColor3 = Color3.fromRGB(160, 130, 185)
+	input.Text = ""
+	input.TextColor3 = Color3.fromRGB(240, 225, 250)
+	input.Font = Enum.Font.Gotham
+	input.TextSize = 14
+	input.ClearTextOnFocus = false
+	Instance.new("UICorner", input).CornerRadius = UDim.new(0, 10)
+	local isp = Instance.new("UIPadding", input)
+	isp.PaddingLeft = UDim.new(0, 12)
+	isp.PaddingRight = UDim.new(0, 12)
+
+	local status = Instance.new("TextLabel", box)
+	status.Size = UDim2.new(1, -40, 0, 20)
+	status.Position = UDim2.new(0, 20, 0, 136)
+	status.BackgroundTransparency = 1
+	status.Text = ""
+	status.TextColor3 = THEME.TEXT_DIM
+	status.Font = Enum.Font.Gotham
+	status.TextSize = 12
+	status.TextXAlignment = Enum.TextXAlignment.Left
+
+	local btn = Instance.new("TextButton", box)
+	btn.Size = UDim2.new(1, -40, 0, 42)
+	btn.Position = UDim2.new(0, 20, 0, 162)
+	btn.BackgroundColor3 = THEME.ACCENT
+	btn.Text = "REDEEM"
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.GothamBlack
+	btn.TextSize = 15
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+	local getKeyLbl = Instance.new("TextLabel", box)
+	getKeyLbl.Size = UDim2.new(1, -40, 0, 18)
+	getKeyLbl.Position = UDim2.new(0, 20, 1, -26)
+	getKeyLbl.BackgroundTransparency = 1
+	getKeyLbl.Text = "Get key: discord.gg/qvizi"
+	getKeyLbl.TextColor3 = THEME.ACCENT2
+	getKeyLbl.Font = Enum.Font.Gotham
+	getKeyLbl.TextSize = 12
+
+	local statusColor = Color3.fromRGB(160, 130, 185)
+	local checking = false
+	local success = false
+
+	local function setStatus(text, color)
+		status.Text = text
+		status.TextColor3 = color or statusColor
+	end
+
+	btn.MouseButton1Click:Connect(function()
+		if checking then return end
+		local key = input.Text
+		if key == "" then
+			setStatus("Enter a key", THEME.RED)
+			playSound(CLICK_SOUND, 0.4)
+			return
+		end
+
+		checking = true
+		btn.Text = "CHECKING..."
+		btn.BackgroundColor3 = THEME.OFF
+		setStatus("Contacting server...", THEME.TEXT_DIM)
+
+		task.spawn(function()
+			local ok, exp, note = checkKeyRemote(key)
+			if ok then
+				saveKey(key)
+				setStatus("Success! Loading...", THEME.GREEN)
+				btn.Text = "SUCCESS"
+				btn.BackgroundColor3 = THEME.GREEN
+				task.wait(0.9)
+				success = true
+				gui:Destroy()
+			else
+				checking = false
+				btn.Text = "REDEEM"
+				btn.BackgroundColor3 = THEME.ACCENT
+				setStatus("Error: " .. tostring(exp), THEME.RED)
+				playSound(CLICK_SOUND, 0.4)
+			end
+		end)
+	end)
+
+	input.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			btn.MouseButton1Click:Fire()
+		end
+	end)
+
+	return function()
+		return success
+	end
+end
+
+local function verifyAccess()
+	local saved = loadSavedKey()
+	if saved and SKIP_IF_SAVED then
+		local ok = checkKeyRemote(saved)
+		if ok then return true end
+	end
+	local waitFn = showKeyGUI()
+	while true do
+		if waitFn() then return true end
+		task.wait(0.1)
+	end
+end
+
+if not verifyAccess() then
+	return
+end
 
 local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
 if introGui then introGui:Destroy() end
@@ -1016,45 +1224,9 @@ local function createMenu()
 
 	local bbColorBox = makeColorPicker(farmPage, 276, "BodyBagColor", "BodyBag Color")
 
-	local slSectionLbl = Instance.new("TextLabel", farmPage)
-	slSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	slSectionLbl.Position = UDim2.new(0, 0, 0, 374)
-	slSectionLbl.BackgroundTransparency = 1
-	slSectionLbl.Text = "Sleeping Players"
-	slSectionLbl.TextColor3 = THEME.TEXT
-	slSectionLbl.Font = Enum.Font.GothamBold
-	slSectionLbl.TextSize = 14
-	slSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-	local slToggleRow = makeToggle(farmPage, "Enable Sleeper ESP", 404, "SleeperESP")
-	task.spawn(function()
-		local slBtn = nil
-		for _, c in ipairs(slToggleRow:GetDescendants()) do
-			if c:IsA("TextButton") then
-				slBtn = c
-				break
-			end
-		end
-		if slBtn then
-			slBtn.MouseButton1Click:Connect(function()
-				task.wait(0.05)
-				if Config.SleeperESP then
-					if _G.QVIZI_START_SL_SCAN then _G.QVIZI_START_SL_SCAN() end
-				else
-					if _G.QVIZI_CLEAR_SL then _G.QVIZI_CLEAR_SL() end
-				end
-			end)
-		end
-	end)
-	makeToggle(farmPage, "Show Distance", 448, "SleeperDistance")
-	makeToggle(farmPage, "Use Custom Color", 492, "SleeperUseCustom")
-	makeSlider(farmPage, "Max Distance", 542, 1, 10000, "SleeperMaxDist", "m")
-
-	local slColorBox = makeColorPicker(farmPage, 606, "SleeperColor", "Sleeper Color")
-
 	local bcSectionLbl = Instance.new("TextLabel", farmPage)
 	bcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	bcSectionLbl.Position = UDim2.new(0, 0, 0, 704)
+	bcSectionLbl.Position = UDim2.new(0, 0, 0, 374)
 	bcSectionLbl.BackgroundTransparency = 1
 	bcSectionLbl.Text = "Base Claim"
 	bcSectionLbl.TextColor3 = THEME.TEXT
@@ -1062,7 +1234,7 @@ local function createMenu()
 	bcSectionLbl.TextSize = 14
 	bcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 734, "BaseClaimESP")
+	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 404, "BaseClaimESP")
 	task.spawn(function()
 		local bcBtn = nil
 		for _, c in ipairs(bcToggleRow:GetDescendants()) do
@@ -1082,15 +1254,15 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Distance", 778, "BaseClaimDistance")
-	makeToggle(farmPage, "Use Custom Color", 822, "BaseClaimUseCustom")
-	makeSlider(farmPage, "Max Distance", 872, 1, 10000, "BaseClaimMaxDist", "m")
+	makeToggle(farmPage, "Show Distance", 448, "BaseClaimDistance")
+	makeToggle(farmPage, "Use Custom Color", 492, "BaseClaimUseCustom")
+	makeSlider(farmPage, "Max Distance", 542, 1, 10000, "BaseClaimMaxDist", "m")
 
-	local bcColorBox = makeColorPicker(farmPage, 936, "BaseClaimColor", "Base Claim Color")
+	local bcColorBox = makeColorPicker(farmPage, 606, "BaseClaimColor", "Base Claim Color")
 
 	local wcSectionLbl = Instance.new("TextLabel", farmPage)
 	wcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	wcSectionLbl.Position = UDim2.new(0, 0, 0, 1034)
+	wcSectionLbl.Position = UDim2.new(0, 0, 0, 704)
 	wcSectionLbl.BackgroundTransparency = 1
 	wcSectionLbl.Text = "Wooden Crate"
 	wcSectionLbl.TextColor3 = THEME.TEXT
@@ -1098,7 +1270,7 @@ local function createMenu()
 	wcSectionLbl.TextSize = 14
 	wcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 1064, "WoodenCrateESP")
+	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 734, "WoodenCrateESP")
 	task.spawn(function()
 		local wcBtn = nil
 		for _, c in ipairs(wcToggleRow:GetDescendants()) do
@@ -1118,13 +1290,13 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Distance", 1108, "WoodenCrateDistance")
-	makeToggle(farmPage, "Use Custom Color", 1152, "WoodenCrateUseCustom")
-	makeSlider(farmPage, "Max Distance", 1202, 1, 10000, "WoodenCrateMaxDist", "m")
+	makeToggle(farmPage, "Show Distance", 778, "WoodenCrateDistance")
+	makeToggle(farmPage, "Use Custom Color", 822, "WoodenCrateUseCustom")
+	makeSlider(farmPage, "Max Distance", 872, 1, 10000, "WoodenCrateMaxDist", "m")
 
-	local wcColorBox = makeColorPicker(farmPage, 1266, "WoodenCrateColor", "Wooden Crate Color")
+	local wcColorBox = makeColorPicker(farmPage, 936, "WoodenCrateColor", "Wooden Crate Color")
 
-	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1370)
+	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1040)
 
 	local setPage = pages["Settings"]
 	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
@@ -1241,11 +1413,6 @@ local function createMenu()
 		Config.BodyBagMaxDist = 5000
 		Config.BodyBagColor = Color3.fromRGB(255, 90, 200)
 		Config.BodyBagUseCustom = false
-		Config.SleeperESP = false
-		Config.SleeperDistance = true
-		Config.SleeperMaxDist = 5000
-		Config.SleeperColor = Color3.fromRGB(180, 180, 190)
-		Config.SleeperUseCustom = false
 		Config.BaseClaimESP = false
 		Config.BaseClaimDistance = true
 		Config.BaseClaimMaxDist = 5000
@@ -1889,128 +2056,6 @@ _G.QVIZI_CLEAR_BB = function()
 	end
 end
 
-local sleeperObjects = {}
-
-local function isSleeper(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	local n = string.lower(inst.Name)
-	return string.find(n, "sleeper", 1, true) ~= nil
-end
-
-local function createSleeperESP(inst)
-	if sleeperObjects[inst] then return end
-	if not isSleeper(inst) then return end
-
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "QVIZI_Sleeper"
-	bb.Size = UDim2.new(0, 200, 0, 50)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
-	bb.AlwaysOnTop = true
-	bb.LightInfluence = 0
-	bb.MaxDistance = 5000
-	bb.Enabled = false
-	bb.Parent = LP:WaitForChild("PlayerGui")
-
-	local nameLbl = Instance.new("TextLabel", bb)
-	nameLbl.Size = UDim2.new(1, 0, 0, 22)
-	nameLbl.Position = UDim2.new(0, 0, 0, 0)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = "[Offline]"
-	nameLbl.TextColor3 = Config.SleeperColor
-	nameLbl.Font = Enum.Font.GothamBold
-	nameLbl.TextSize = 15
-	nameLbl.TextStrokeTransparency = 0
-	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local distLbl = Instance.new("TextLabel", bb)
-	distLbl.Size = UDim2.new(1, 0, 0, 18)
-	distLbl.Position = UDim2.new(0, 0, 0, 24)
-	distLbl.BackgroundTransparency = 1
-	distLbl.Text = ""
-	distLbl.TextColor3 = Config.SleeperColor
-	distLbl.Font = Enum.Font.GothamBold
-	distLbl.TextSize = 14
-	distLbl.TextStrokeTransparency = 0
-	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "QVIZI_SleeperHL"
-	highlight.FillColor = Config.SleeperColor
-	highlight.OutlineColor = Config.SleeperColor
-	highlight.FillTransparency = 0.6
-	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = nil
-	highlight.Enabled = false
-	highlight.Parent = LP:WaitForChild("PlayerGui")
-
-	sleeperObjects[inst] = {
-		bb = bb,
-		nameLbl = nameLbl,
-		distLbl = distLbl,
-		highlight = highlight,
-	}
-end
-
-local function removeSleeperESP(inst)
-	if sleeperObjects[inst] then
-		pcall(function() sleeperObjects[inst].bb:Destroy() end)
-		pcall(function() sleeperObjects[inst].highlight:Destroy() end)
-		sleeperObjects[inst] = nil
-	end
-end
-
-local slScanState = { running = false }
-
-local function processSleeper(inst)
-	if not Config.SleeperESP then return end
-	if sleeperObjects[inst] then return end
-	if not inst.Parent then return end
-	if not isSleeper(inst) then return end
-	createSleeperESP(inst)
-end
-
-local function scanSleepers()
-	if not Config.SleeperESP then return end
-	if slScanState.running then return end
-	slScanState.running = true
-
-	task.spawn(function()
-		pcall(function()
-			local children = workspace:GetChildren()
-			local batchSize = 50
-			local i = 1
-			while i <= #children do
-				if not Config.SleeperESP then
-					slScanState.running = false
-					return
-				end
-				local batchEnd = math.min(i + batchSize - 1, #children)
-				for j = i, batchEnd do
-					local child = children[j]
-					if isSleeper(child) then
-						processSleeper(child)
-					end
-				end
-				i = batchEnd + 1
-				task.wait()
-			end
-		end)
-		slScanState.running = false
-	end)
-end
-
-_G.QVIZI_START_SL_SCAN = function()
-	if not Config.SleeperESP then return end
-	scanSleepers()
-end
-
-_G.QVIZI_CLEAR_SL = function()
-	for inst, _ in pairs(sleeperObjects) do
-		removeSleeperESP(inst)
-	end
-end
-
 local baseClaimObjects = {}
 local woodenCrateObjects = {}
 
@@ -2171,9 +2216,6 @@ registerCleanup(function()
 	for inst, _ in pairs(bodyBagObjects) do
 		removeBodyBagESP(inst)
 	end
-	for inst, _ in pairs(sleeperObjects) do
-		removeSleeperESP(inst)
-	end
 end)
 
 local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
@@ -2183,12 +2225,6 @@ local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
 		task.defer(function()
 			if not Config.BodyBagESP then return end
 			processBodyBag(inst)
-		end)
-	end
-	if Config.SleeperESP and string.find(n, "sleeper", 1, true) then
-		task.defer(function()
-			if not Config.SleeperESP then return end
-			processSleeper(inst)
 		end)
 	end
 	if Config.BaseClaimESP and inst.Name == "Base Claim" then
@@ -2212,9 +2248,6 @@ end)
 local descRemovedConn = workspace.DescendantRemoving:Connect(function(inst)
 	if bodyBagObjects[inst] then
 		removeBodyBagESP(inst)
-	end
-	if sleeperObjects[inst] then
-		removeSleeperESP(inst)
 	end
 	if baseClaimObjects[inst] then
 		removeBaseClaimESP(inst)
@@ -2440,54 +2473,6 @@ local renderConn = RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	for inst, objs in pairs(sleeperObjects) do
-		if not inst.Parent then
-			removeSleeperESP(inst)
-			continue
-		end
-
-		if not Config.SleeperESP then
-			if objs.bb.Enabled then
-				objs.bb.Enabled = false
-				objs.highlight.Enabled = false
-			end
-			continue
-		end
-
-		local pos = getModelPosition(inst)
-		local adornee = getModelAdornee(inst)
-
-		if pos and adornee then
-			local distance = (Camera.CFrame.Position - pos).Magnitude
-			if distance <= Config.SleeperMaxDist then
-				objs.bb.Adornee = adornee
-				objs.bb.Enabled = true
-
-				local col = Config.SleeperUseCustom and Config.SleeperColor or Config.ESPColor
-
-				objs.nameLbl.TextColor3 = col
-				if Config.SleeperDistance then
-					objs.distLbl.Visible = true
-					objs.distLbl.TextColor3 = col
-					objs.distLbl.Text = string.format("%dm", math.floor(distance))
-				else
-					objs.distLbl.Visible = false
-				end
-
-				objs.highlight.Adornee = inst
-				objs.highlight.Enabled = true
-				objs.highlight.FillColor = col
-				objs.highlight.OutlineColor = col
-			else
-				objs.bb.Enabled = false
-				objs.highlight.Enabled = false
-			end
-		else
-			objs.bb.Enabled = false
-			objs.highlight.Enabled = false
-		end
-	end
-
 	for inst, objs in pairs(baseClaimObjects) do
 		if not inst.Parent then
 			removeBaseClaimESP(inst)
@@ -2663,9 +2648,6 @@ task.spawn(function()
 	task.wait(1)
 	if Config.BodyBagESP and _G.QVIZI_START_BB_SCAN then
 		_G.QVIZI_START_BB_SCAN()
-	end
-	if Config.SleeperESP and _G.QVIZI_START_SL_SCAN then
-		_G.QVIZI_START_SL_SCAN()
 	end
 	if Config.BaseClaimESP and _G.QVIZI_START_BC_SCAN then
 		_G.QVIZI_START_BC_SCAN()
