@@ -24,7 +24,7 @@ _G.QVIZI_LOADED = true
 
 local VERSION = "V1.7"
 
-local KEYS_URL = "https://raw.githubusercontent.com/mokotikDEV0/qvizi-keys/refs/heads/main/keys.json"
+local KEYS_URL = "https://raw.githubusercontent.com/mokotikDEV0/qvizi-keys/main/keys.json"
 local KEY_FILE = "qvizi_key.txt"
 local SKIP_IF_SAVED = true
 
