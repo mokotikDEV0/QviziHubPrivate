@@ -340,7 +340,7 @@ local function showKeyGUI()
 	getKeyLbl.Size = UDim2.new(1, -40, 0, 18)
 	getKeyLbl.Position = UDim2.new(0, 20, 1, -26)
 	getKeyLbl.BackgroundTransparency = 1
-	getKeyLbl.Text = "Get key: discord.gg/qvizi"
+	getKeyLbl.Text = "Get key: t.me/QviziHub"
 	getKeyLbl.TextColor3 = THEME.ACCENT2
 	getKeyLbl.Font = Enum.Font.Gotham
 	getKeyLbl.TextSize = 12
