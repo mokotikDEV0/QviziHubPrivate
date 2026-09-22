@@ -22,7 +22,7 @@ if _G.QVIZI_LOADED then
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.3"
+local VERSION = "V1.4"
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
