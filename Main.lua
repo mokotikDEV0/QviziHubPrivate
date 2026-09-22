@@ -173,6 +173,9 @@ local function registerCleanup(fn)
 	table.insert(cleanupFns, fn)
 end
 
+_G.QVIZI_START_BB_SCAN = nil
+_G.QVIZI_CLEAR_BB = nil
+
 local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
 if introGui then introGui:Destroy() end
 
@@ -932,7 +935,26 @@ local function createMenu()
 	end)
 
 	local farmPage = pages["Farm"]
-	makeToggle(farmPage, "Enable BodyBag ESP", 0, "BodyBagESP")
+	local bbToggleRow = makeToggle(farmPage, "Enable BodyBag ESP", 0, "BodyBagESP")
+	task.spawn(function()
+		local bbBtn = nil
+		for _, c in ipairs(bbToggleRow:GetDescendants()) do
+			if c:IsA("TextButton") then
+				bbBtn = c
+				break
+			end
+		end
+		if bbBtn then
+			bbBtn.MouseButton1Click:Connect(function()
+				task.wait(0.05)
+				if Config.BodyBagESP then
+					if _G.QVIZI_START_BB_SCAN then _G.QVIZI_START_BB_SCAN() end
+				else
+					if _G.QVIZI_CLEAR_BB then _G.QVIZI_CLEAR_BB() end
+				end
+			end)
+		end
+	end)
 	makeToggle(farmPage, "Show Owner", 44, "BodyBagOwner")
 	makeToggle(farmPage, "Show Distance", 88, "BodyBagDistance")
 	makeSlider(farmPage, "Max Distance", 138, 1, 10000, "BodyBagMaxDist", "m")
@@ -1514,6 +1536,7 @@ for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 Players.PlayerRemoving:Connect(removeESP)
 
 local bodyBagObjects = {}
+local bodyBagPending = {}
 
 local function isBodyBag(inst)
 	if not inst or not inst:IsA("Model") then return false end
@@ -1522,28 +1545,14 @@ local function isBodyBag(inst)
 end
 
 local function getOwnerName(inst)
-	local nameAttr = inst:GetAttribute("PlayerName")
-	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
-		return nameAttr
-	end
-	nameAttr = inst:GetAttribute("playerName")
-	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
-		return nameAttr
-	end
-	nameAttr = inst:GetAttribute("Owner")
-	if nameAttr and type(nameAttr) == "string" and nameAttr ~= "" then
-		return nameAttr
-	end
-
 	local direct = inst:FindFirstChild("PlayerName")
 	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
 		return direct.Value
 	end
-	direct = inst:FindFirstChild("Owner")
-	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
-		return direct.Value
+	local ownerAttr = inst:GetAttribute("PlayerName")
+	if ownerAttr and type(ownerAttr) == "string" and ownerAttr ~= "" then
+		return ownerAttr
 	end
-
 	for _, d in ipairs(inst:GetChildren()) do
 		if d:IsA("StringValue") and d.Value ~= "" then
 			return d.Value
@@ -1552,22 +1561,6 @@ local function getOwnerName(inst)
 			return d.Value.Name
 		end
 	end
-
-	for _, d in ipairs(inst:GetDescendants()) do
-		if d:IsA("StringValue") then
-			local dn = string.lower(d.Name)
-			if dn == "playername" or dn == "owner" or dn == "player" or dn == "username" then
-				if d.Value ~= "" then return d.Value end
-			end
-		end
-		if d:IsA("ObjectValue") then
-			local dn = string.lower(d.Name)
-			if dn == "playername" or dn == "owner" or dn == "player" then
-				if d.Value then return d.Value.Name end
-			end
-		end
-	end
-
 	return nil
 end
 
@@ -1660,36 +1653,73 @@ local function removeBodyBagESP(inst)
 		pcall(function() bodyBagObjects[inst].highlight:Destroy() end)
 		bodyBagObjects[inst] = nil
 	end
+	bodyBagPending[inst] = nil
 end
 
-local scanRunning = false
-local lastScan = 0
+local scanState = {
+	running = false,
+}
 
-local function scanBodyBags()
-	if scanRunning then return end
-	local now = tick()
-	if now - lastScan < 1 then return end
-	lastScan = now
-	scanRunning = true
+local function processBodyBag(inst)
+	if not Config.BodyBagESP then return end
+	if bodyBagObjects[inst] then return end
+	if not inst.Parent then return end
+	if not isBodyBag(inst) then return end
+	createBodyBagESP(inst)
+end
+
+local function scanViaRootChildren()
+	if not Config.BodyBagESP then return end
+	if scanState.running then return end
+	scanState.running = true
 
 	task.spawn(function()
-		pcall(function()
-			for _, inst in ipairs(workspace:GetDescendants()) do
-				if isBodyBag(inst) then
-					createBodyBagESP(inst)
+		local ok, err = pcall(function()
+			local children = workspace:GetChildren()
+			local batchSize = 50
+			local i = 1
+			while i <= #children do
+				if not Config.BodyBagESP then
+					scanState.running = false
+					return
 				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isBodyBag(child) then
+						processBodyBag(child)
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
 			end
 		end)
-		scanRunning = false
+		if not ok then
+			warn("[QVIZI] BodyBag scan error:", err)
+		end
+		scanState.running = false
 	end)
 end
 
-scanBodyBags()
+_G.QVIZI_START_BB_SCAN = function()
+	if not Config.BodyBagESP then return end
+	scanViaRootChildren()
+end
+
+_G.QVIZI_CLEAR_BB = function()
+	for inst, _ in pairs(bodyBagObjects) do
+		removeBodyBagESP(inst)
+	end
+end
 
 local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
-	if not isBodyBag(inst) then return end
+	if not Config.BodyBagESP then return end
+	if not inst:IsA("Model") then return end
+	local n = string.lower(inst.Name)
+	if not string.find(n, "bodybag", 1, true) then return end
 	task.defer(function()
-		createBodyBagESP(inst)
+		if not Config.BodyBagESP then return end
+		processBodyBag(inst)
 	end)
 end)
 
@@ -1702,13 +1732,6 @@ end)
 registerCleanup(function()
 	if descAddedConn then descAddedConn:Disconnect() end
 	if descRemovedConn then descRemovedConn:Disconnect() end
-end)
-
-task.spawn(function()
-	while _G.QVIZI_LOADED do
-		task.wait(3)
-		scanBodyBags()
-	end
 end)
 
 registerCleanup(function()
@@ -1849,7 +1872,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 						objs.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 					else
 						objs.highlight.FillTransparency = 0.75
-						objs.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						objs.highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 					end
 				else
 					objs.highlight.Enabled = false
@@ -2000,4 +2023,8 @@ task.spawn(function()
 	end
 	task.wait(0.2)
 	createMenu()
+	if Config.BodyBagESP and _G.QVIZI_START_BB_SCAN then
+		task.wait(1)
+		_G.QVIZI_START_BB_SCAN()
+	end
 end)
