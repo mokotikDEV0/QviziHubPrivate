@@ -778,16 +778,17 @@ local function createMenu()
 	end
 
 	local function makeColorPicker(parent, y, key, labelText)
-		local colorRow = Instance.new("Frame", parent)
-		colorRow.Size = UDim2.new(1, -10, 0, 42)
-		colorRow.Position = UDim2.new(0, 0, 0, y)
-		colorRow.BackgroundColor3 = THEME.ROW
-		colorRow.BorderSizePixel = 0
-		Instance.new("UICorner", colorRow).CornerRadius = UDim.new(0, 10)
+		local holder = Instance.new("Frame", parent)
+		holder.Size = UDim2.new(1, -10, 0, 42)
+		holder.Position = UDim2.new(0, 0, 0, y)
+		holder.BackgroundColor3 = THEME.ROW
+		holder.BorderSizePixel = 0
+		holder.ClipsDescendants = true
+		Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 10)
 
-		local cLbl = Instance.new("TextLabel", colorRow)
+		local cLbl = Instance.new("TextLabel", holder)
 		cLbl.BackgroundTransparency = 1
-		cLbl.Size = UDim2.new(0.5, 0, 1, 0)
+		cLbl.Size = UDim2.new(0.5, 0, 0, 42)
 		cLbl.Position = UDim2.new(0, 14, 0, 0)
 		cLbl.Text = labelText
 		cLbl.TextColor3 = THEME.TEXT
@@ -795,22 +796,22 @@ local function createMenu()
 		cLbl.TextSize = 14
 		cLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-		local colorBox = Instance.new("TextButton", colorRow)
+		local colorBox = Instance.new("TextButton", holder)
 		colorBox.Size = UDim2.new(0, 70, 0, 26)
-		colorBox.Position = UDim2.new(1, -84, 0.5, -13)
+		colorBox.Position = UDim2.new(1, -84, 0, 8)
 		colorBox.BackgroundColor3 = Config[key]
 		colorBox.Text = ""
 		colorBox.BorderSizePixel = 0
 		colorBox.AutoButtonColor = false
 		Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 8)
 
-		local picker = Instance.new("Frame", parent)
-		picker.Size = UDim2.new(1, -10, 0, 84)
-		picker.Position = UDim2.new(0, 0, 0, y + 46)
-		picker.BackgroundColor3 = THEME.ROW
+		local picker = Instance.new("Frame", holder)
+		picker.Size = UDim2.new(1, -20, 0, 84)
+		picker.Position = UDim2.new(0, 10, 0, 52)
+		picker.BackgroundColor3 = THEME.BG
 		picker.BorderSizePixel = 0
 		picker.Visible = false
-		Instance.new("UICorner", picker).CornerRadius = UDim.new(0, 10)
+		Instance.new("UICorner", picker).CornerRadius = UDim.new(0, 8)
 
 		local hueBar = Instance.new("Frame", picker)
 		hueBar.Size = UDim2.new(1, -20, 0, 14)
@@ -894,10 +895,16 @@ local function createMenu()
 			updateColor()
 		end)
 
+		local pickerOpen = false
 		colorBox.MouseButton1Click:Connect(function()
 			playClick()
-			picker.Visible = not picker.Visible
-			parent.CanvasSize = UDim2.new(0, 0, 0, picker.Visible and (y + 140) or (y + 50))
+			pickerOpen = not pickerOpen
+			picker.Visible = pickerOpen
+			if pickerOpen then
+				holder.Size = UDim2.new(1, -10, 0, 146)
+			else
+				holder.Size = UDim2.new(1, -10, 0, 42)
+			end
 		end)
 
 		return colorBox, picker
