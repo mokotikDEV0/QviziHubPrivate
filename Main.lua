@@ -22,7 +22,7 @@ if _G.QVIZI_LOADED then
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.0"
+local VERSION = "V1.2"
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
@@ -35,6 +35,7 @@ local THEME = {
 	OFF = Color3.fromRGB(45, 28, 60),
 	GREEN = Color3.fromRGB(0, 220, 100),
 	RED = Color3.fromRGB(255, 60, 80),
+	GRAY = Color3.fromRGB(150, 150, 160),
 }
 
 local CLICK_SOUND = "rbxassetid://139719503904449"
@@ -66,6 +67,15 @@ local Config = {
 	BodyBagOwner = true,
 	BodyBagDistance = true,
 	BodyBagMaxDist = 5000,
+	SleeperESP = false,
+	SleeperDistance = true,
+	SleeperMaxDist = 5000,
+	BaseClaimESP = false,
+	BaseClaimDistance = true,
+	BaseClaimMaxDist = 5000,
+	WoodenCrateESP = false,
+	WoodenCrateDistance = true,
+	WoodenCrateMaxDist = 5000,
 }
 
 local DEFAULT_SPEED = 16
@@ -175,6 +185,12 @@ end
 
 _G.QVIZI_START_BB_SCAN = nil
 _G.QVIZI_CLEAR_BB = nil
+_G.QVIZI_START_SL_SCAN = nil
+_G.QVIZI_CLEAR_SL = nil
+_G.QVIZI_START_BC_SCAN = nil
+_G.QVIZI_CLEAR_BC = nil
+_G.QVIZI_START_WC_SCAN = nil
+_G.QVIZI_CLEAR_WC = nil
 
 local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
 if introGui then introGui:Destroy() end
@@ -585,6 +601,9 @@ local function createMenu()
 		p.ScrollBarImageColor3 = THEME.ACCENT
 		p.Visible = false
 		p.CanvasSize = UDim2.new(0, 0, 0, 900)
+		p.ScrollingEnabled = true
+		p.ElasticBehavior = Enum.ElasticBehavior.Never
+		p.ScrollBarImageTransparency = 0.3
 
 		tabs[name] = b
 		pages[name] = p
@@ -742,6 +761,132 @@ local function createMenu()
 		return row
 	end
 
+	local function makeColorPicker(parent, y, key, labelText)
+		local colorRow = Instance.new("Frame", parent)
+		colorRow.Size = UDim2.new(1, -10, 0, 42)
+		colorRow.Position = UDim2.new(0, 0, 0, y)
+		colorRow.BackgroundColor3 = THEME.ROW
+		colorRow.BorderSizePixel = 0
+		Instance.new("UICorner", colorRow).CornerRadius = UDim.new(0, 10)
+
+		local cLbl = Instance.new("TextLabel", colorRow)
+		cLbl.BackgroundTransparency = 1
+		cLbl.Size = UDim2.new(0.5, 0, 1, 0)
+		cLbl.Position = UDim2.new(0, 14, 0, 0)
+		cLbl.Text = labelText
+		cLbl.TextColor3 = THEME.TEXT
+		cLbl.Font = Enum.Font.Gotham
+		cLbl.TextSize = 14
+		cLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+		local colorBox = Instance.new("TextButton", colorRow)
+		colorBox.Size = UDim2.new(0, 70, 0, 26)
+		colorBox.Position = UDim2.new(1, -84, 0.5, -13)
+		colorBox.BackgroundColor3 = Config[key]
+		colorBox.Text = ""
+		colorBox.BorderSizePixel = 0
+		colorBox.AutoButtonColor = false
+		Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 8)
+
+		local picker = Instance.new("Frame", parent)
+		picker.Size = UDim2.new(1, -10, 0, 84)
+		picker.Position = UDim2.new(0, 0, 0, y + 46)
+		picker.BackgroundColor3 = THEME.ROW
+		picker.BorderSizePixel = 0
+		picker.Visible = false
+		Instance.new("UICorner", picker).CornerRadius = UDim.new(0, 10)
+
+		local hueBar = Instance.new("Frame", picker)
+		hueBar.Size = UDim2.new(1, -20, 0, 14)
+		hueBar.Position = UDim2.new(0, 10, 0, 12)
+		hueBar.BackgroundColor3 = Color3.new(1, 1, 1)
+		hueBar.BorderSizePixel = 0
+		Instance.new("UICorner", hueBar).CornerRadius = UDim.new(1, 0)
+		local hueGrad = Instance.new("UIGradient", hueBar)
+		hueGrad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+			ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+			ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+			ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+			ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+		})
+
+		local satBar = Instance.new("Frame", picker)
+		satBar.Size = UDim2.new(1, -20, 0, 14)
+		satBar.Position = UDim2.new(0, 10, 0, 34)
+		satBar.BackgroundColor3 = Color3.new(1, 1, 1)
+		satBar.BorderSizePixel = 0
+		Instance.new("UICorner", satBar).CornerRadius = UDim.new(1, 0)
+		local satGrad = Instance.new("UIGradient", satBar)
+
+		local valBar = Instance.new("Frame", picker)
+		valBar.Size = UDim2.new(1, -20, 0, 14)
+		valBar.Position = UDim2.new(0, 10, 0, 56)
+		valBar.BackgroundColor3 = Color3.new(1, 1, 1)
+		valBar.BorderSizePixel = 0
+		Instance.new("UICorner", valBar).CornerRadius = UDim.new(1, 0)
+		local valGrad = Instance.new("UIGradient", valBar)
+
+		local h, s, v = Config[key]:ToHSV()
+
+		local function updateColor()
+			Config[key] = Color3.fromHSV(h, s, v)
+			colorBox.BackgroundColor3 = Config[key]
+			satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(h, 1, 1))
+			valGrad.Color = ColorSequence.new(Color3.new(0, 0, 0), Color3.fromHSV(h, s, 1))
+			saveCfgDelayed()
+		end
+		updateColor()
+
+		local function makeBarDrag(bar, cb)
+			local drag = false
+			local started = false
+			bar.InputBegan:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+					drag = true
+					started = false
+				end
+			end)
+			UserInputService.InputChanged:Connect(function(i)
+				if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+					if not started then
+						started = true
+						playClick()
+					end
+					cb(i.Position.X)
+				end
+			end)
+			UserInputService.InputEnded:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+					drag = false
+				end
+			end)
+		end
+
+		makeBarDrag(hueBar, function(x)
+			h = math.clamp((x - hueBar.AbsolutePosition.X) / hueBar.AbsoluteSize.X, 0, 1)
+			updateColor()
+		end)
+		makeBarDrag(satBar, function(x)
+			s = math.clamp((x - satBar.AbsolutePosition.X) / satBar.AbsoluteSize.X, 0, 1)
+			updateColor()
+		end)
+		makeBarDrag(valBar, function(x)
+			v = math.clamp((x - valBar.AbsolutePosition.X) / valBar.AbsoluteSize.X, 0, 1)
+			updateColor()
+		end)
+
+		colorBox.MouseButton1Click:Connect(function()
+			playClick()
+			picker.Visible = not picker.Visible
+			parent.CanvasSize = UDim2.new(0, 0, 0, picker.Visible and (y + 140) or (y + 50))
+		end)
+
+		return colorBox, picker
+	end
+
 	local espPage = pages["ESP"]
 	makeToggle(espPage, "Enable ESP", 0, "ESP")
 	makeToggle(espPage, "Show Name", 44, "ESPName")
@@ -752,137 +897,12 @@ local function createMenu()
 	makeToggle(espPage, "Rainbow Mode", 264, "ESPRainbow")
 	makeSlider(espPage, "Max Distance", 314, 1, 10000, "ESPMaxDist", "m")
 
-	local colorRow = Instance.new("Frame", espPage)
-	colorRow.Size = UDim2.new(1, -10, 0, 42)
-	colorRow.Position = UDim2.new(0, 0, 0, 378)
-	colorRow.BackgroundColor3 = THEME.ROW
-	colorRow.BorderSizePixel = 0
-	Instance.new("UICorner", colorRow).CornerRadius = UDim.new(0, 10)
-
-	local cLbl = Instance.new("TextLabel", colorRow)
-	cLbl.BackgroundTransparency = 1
-	cLbl.Size = UDim2.new(0.5, 0, 1, 0)
-	cLbl.Position = UDim2.new(0, 14, 0, 0)
-	cLbl.Text = "ESP Color"
-	cLbl.TextColor3 = THEME.TEXT
-	cLbl.Font = Enum.Font.Gotham
-	cLbl.TextSize = 14
-	cLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-	local colorBox = Instance.new("TextButton", colorRow)
-	colorBox.Size = UDim2.new(0, 70, 0, 26)
-	colorBox.Position = UDim2.new(1, -84, 0.5, -13)
-	colorBox.BackgroundColor3 = Config.ESPColor
-	colorBox.Text = ""
-	colorBox.BorderSizePixel = 0
-	colorBox.AutoButtonColor = false
-	Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 8)
-
-	local picker = Instance.new("Frame", espPage)
-	picker.Size = UDim2.new(1, -10, 0, 84)
-	picker.Position = UDim2.new(0, 0, 0, 424)
-	picker.BackgroundColor3 = THEME.ROW
-	picker.BorderSizePixel = 0
-	picker.Visible = false
-	Instance.new("UICorner", picker).CornerRadius = UDim.new(0, 10)
-
-	local hueBar = Instance.new("Frame", picker)
-	hueBar.Size = UDim2.new(1, -20, 0, 14)
-	hueBar.Position = UDim2.new(0, 10, 0, 12)
-	hueBar.BackgroundColor3 = Color3.new(1, 1, 1)
-	hueBar.BorderSizePixel = 0
-	Instance.new("UICorner", hueBar).CornerRadius = UDim.new(1, 0)
-	local hueGrad = Instance.new("UIGradient", hueBar)
-	hueGrad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-		ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-		ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-		ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-		ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
-	})
-
-	local satBar = Instance.new("Frame", picker)
-	satBar.Size = UDim2.new(1, -20, 0, 14)
-	satBar.Position = UDim2.new(0, 10, 0, 34)
-	satBar.BackgroundColor3 = Color3.new(1, 1, 1)
-	satBar.BorderSizePixel = 0
-	Instance.new("UICorner", satBar).CornerRadius = UDim.new(1, 0)
-	local satGrad = Instance.new("UIGradient", satBar)
-
-	local valBar = Instance.new("Frame", picker)
-	valBar.Size = UDim2.new(1, -20, 0, 14)
-	valBar.Position = UDim2.new(0, 10, 0, 56)
-	valBar.BackgroundColor3 = Color3.new(1, 1, 1)
-	valBar.BorderSizePixel = 0
-	Instance.new("UICorner", valBar).CornerRadius = UDim.new(1, 0)
-	local valGrad = Instance.new("UIGradient", valBar)
-
-	local h, s, v = Config.ESPColor:ToHSV()
-
-	local function updateColor()
-		if Config.ESPRainbow then return end
-		Config.ESPColor = Color3.fromHSV(h, s, v)
-		colorBox.BackgroundColor3 = Config.ESPColor
-		satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(h, 1, 1))
-		valGrad.Color = ColorSequence.new(Color3.new(0, 0, 0), Color3.fromHSV(h, s, 1))
-		saveCfgDelayed()
-	end
-	updateColor()
-
-	local function makeBarDrag(bar, cb)
-		local drag = false
-		local started = false
-		bar.InputBegan:Connect(function(i)
-			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-				drag = true
-				started = false
-			end
-		end)
-		UserInputService.InputChanged:Connect(function(i)
-			if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-				if not started then
-					started = true
-					playClick()
-				end
-				cb(i.Position.X)
-			end
-		end)
-		UserInputService.InputEnded:Connect(function(i)
-			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-				drag = false
-			end
-		end)
-	end
-
-	makeBarDrag(hueBar, function(x)
-		if Config.ESPRainbow then return end
-		h = math.clamp((x - hueBar.AbsolutePosition.X) / hueBar.AbsoluteSize.X, 0, 1)
-		updateColor()
-	end)
-	makeBarDrag(satBar, function(x)
-		if Config.ESPRainbow then return end
-		s = math.clamp((x - satBar.AbsolutePosition.X) / satBar.AbsoluteSize.X, 0, 1)
-		updateColor()
-	end)
-	makeBarDrag(valBar, function(x)
-		if Config.ESPRainbow then return end
-		v = math.clamp((x - valBar.AbsolutePosition.X) / valBar.AbsoluteSize.X, 0, 1)
-		updateColor()
-	end)
-
-	colorBox.MouseButton1Click:Connect(function()
-		playClick()
-		if Config.ESPRainbow then return end
-		picker.Visible = not picker.Visible
-		espPage.CanvasSize = UDim2.new(0, 0, 0, picker.Visible and 520 or 430)
-	end)
+	local espColorBox, espPicker = makeColorPicker(espPage, 378, "ESPColor", "ESP Color")
 
 	task.spawn(function()
 		while gui.Parent do
 			if Config.ESPRainbow then
-				colorBox.BackgroundColor3 = Config.ESPColor
+				espColorBox.BackgroundColor3 = Config.ESPColor
 			end
 			task.wait(0.05)
 		end
@@ -935,7 +955,18 @@ local function createMenu()
 	end)
 
 	local farmPage = pages["Farm"]
-	local bbToggleRow = makeToggle(farmPage, "Enable BodyBag ESP", 0, "BodyBagESP")
+
+	local bbSectionLbl = Instance.new("TextLabel", farmPage)
+	bbSectionLbl.Size = UDim2.new(1, -10, 0, 22)
+	bbSectionLbl.Position = UDim2.new(0, 0, 0, 0)
+	bbSectionLbl.BackgroundTransparency = 1
+	bbSectionLbl.Text = "Body Bags"
+	bbSectionLbl.TextColor3 = THEME.TEXT
+	bbSectionLbl.Font = Enum.Font.GothamBold
+	bbSectionLbl.TextSize = 14
+	bbSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+	local bbToggleRow = makeToggle(farmPage, "Enable BodyBag ESP", 30, "BodyBagESP")
 	task.spawn(function()
 		local bbBtn = nil
 		for _, c in ipairs(bbToggleRow:GetDescendants()) do
@@ -955,9 +986,110 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Owner", 44, "BodyBagOwner")
-	makeToggle(farmPage, "Show Distance", 88, "BodyBagDistance")
-	makeSlider(farmPage, "Max Distance", 138, 1, 10000, "BodyBagMaxDist", "m")
+	makeToggle(farmPage, "Show Owner", 74, "BodyBagOwner")
+	makeToggle(farmPage, "Show Distance", 118, "BodyBagDistance")
+	makeSlider(farmPage, "Max Distance", 168, 1, 10000, "BodyBagMaxDist", "m")
+
+	local slSectionLbl = Instance.new("TextLabel", farmPage)
+	slSectionLbl.Size = UDim2.new(1, -10, 0, 22)
+	slSectionLbl.Position = UDim2.new(0, 0, 0, 232)
+	slSectionLbl.BackgroundTransparency = 1
+	slSectionLbl.Text = "Sleeping Players"
+	slSectionLbl.TextColor3 = THEME.TEXT
+	slSectionLbl.Font = Enum.Font.GothamBold
+	slSectionLbl.TextSize = 14
+	slSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+	local slToggleRow = makeToggle(farmPage, "Enable Sleeper ESP", 262, "SleeperESP")
+	task.spawn(function()
+		local slBtn = nil
+		for _, c in ipairs(slToggleRow:GetDescendants()) do
+			if c:IsA("TextButton") then
+				slBtn = c
+				break
+			end
+		end
+		if slBtn then
+			slBtn.MouseButton1Click:Connect(function()
+				task.wait(0.05)
+				if Config.SleeperESP then
+					if _G.QVIZI_START_SL_SCAN then _G.QVIZI_START_SL_SCAN() end
+				else
+					if _G.QVIZI_CLEAR_SL then _G.QVIZI_CLEAR_SL() end
+				end
+			end)
+		end
+	end)
+	makeToggle(farmPage, "Show Distance", 306, "SleeperDistance")
+	makeSlider(farmPage, "Max Distance", 356, 1, 10000, "SleeperMaxDist", "m")
+
+	local bcSectionLbl = Instance.new("TextLabel", farmPage)
+	bcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
+	bcSectionLbl.Position = UDim2.new(0, 0, 0, 420)
+	bcSectionLbl.BackgroundTransparency = 1
+	bcSectionLbl.Text = "Base Claim"
+	bcSectionLbl.TextColor3 = THEME.TEXT
+	bcSectionLbl.Font = Enum.Font.GothamBold
+	bcSectionLbl.TextSize = 14
+	bcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 450, "BaseClaimESP")
+	task.spawn(function()
+		local bcBtn = nil
+		for _, c in ipairs(bcToggleRow:GetDescendants()) do
+			if c:IsA("TextButton") then
+				bcBtn = c
+				break
+			end
+		end
+		if bcBtn then
+			bcBtn.MouseButton1Click:Connect(function()
+				task.wait(0.05)
+				if Config.BaseClaimESP then
+					if _G.QVIZI_START_BC_SCAN then _G.QVIZI_START_BC_SCAN() end
+				else
+					if _G.QVIZI_CLEAR_BC then _G.QVIZI_CLEAR_BC() end
+				end
+			end)
+		end
+	end)
+	makeToggle(farmPage, "Show Distance", 494, "BaseClaimDistance")
+	makeSlider(farmPage, "Max Distance", 544, 1, 10000, "BaseClaimMaxDist", "m")
+
+	local wcSectionLbl = Instance.new("TextLabel", farmPage)
+	wcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
+	wcSectionLbl.Position = UDim2.new(0, 0, 0, 608)
+	wcSectionLbl.BackgroundTransparency = 1
+	wcSectionLbl.Text = "Wooden Crate"
+	wcSectionLbl.TextColor3 = THEME.TEXT
+	wcSectionLbl.Font = Enum.Font.GothamBold
+	wcSectionLbl.TextSize = 14
+	wcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 638, "WoodenCrateESP")
+	task.spawn(function()
+		local wcBtn = nil
+		for _, c in ipairs(wcToggleRow:GetDescendants()) do
+			if c:IsA("TextButton") then
+				wcBtn = c
+				break
+			end
+		end
+		if wcBtn then
+			wcBtn.MouseButton1Click:Connect(function()
+				task.wait(0.05)
+				if Config.WoodenCrateESP then
+					if _G.QVIZI_START_WC_SCAN then _G.QVIZI_START_WC_SCAN() end
+				else
+					if _G.QVIZI_CLEAR_WC then _G.QVIZI_CLEAR_WC() end
+				end
+			end)
+		end
+	end)
+	makeToggle(farmPage, "Show Distance", 682, "WoodenCrateDistance")
+	makeSlider(farmPage, "Max Distance", 732, 1, 10000, "WoodenCrateMaxDist", "m")
+
+	farmPage.CanvasSize = UDim2.new(0, 0, 0, 830)
 
 	local setPage = pages["Settings"]
 	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
@@ -1072,6 +1204,15 @@ local function createMenu()
 		Config.BodyBagOwner = true
 		Config.BodyBagDistance = true
 		Config.BodyBagMaxDist = 5000
+		Config.SleeperESP = false
+		Config.SleeperDistance = true
+		Config.SleeperMaxDist = 5000
+		Config.BaseClaimESP = false
+		Config.BaseClaimDistance = true
+		Config.BaseClaimMaxDist = 5000
+		Config.WoodenCrateESP = false
+		Config.WoodenCrateDistance = true
+		Config.WoodenCrateMaxDist = 5000
 		saveCfg()
 	end)
 
@@ -1535,8 +1676,254 @@ for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 
 Players.PlayerRemoving:Connect(removeESP)
 
+local function makeSimpleESP(isTargetFn, createFn, removeFn, scanFn, startFnName, clearFnName, objectsTable, maxDistKey, distanceKey)
+	local scanState = { running = false }
+
+	local function process(inst)
+		if not Config[objectsTable.enabledKey] then return end
+		if objectsTable.objects[inst] then return end
+		if not inst.Parent then return end
+		if not isTargetFn(inst) then return end
+		createFn(inst)
+	end
+
+	local function scan()
+		if not Config[objectsTable.enabledKey] then return end
+		if scanState.running then return end
+		scanState.running = true
+		task.spawn(function()
+			pcall(function()
+				local root = workspace:FindFirstChild("PlayerBuiltStructures")
+				if not root then
+					scanState.running = false
+					return
+				end
+				local deployables = root:FindFirstChild("Deployables")
+				if not deployables then
+					scanState.running = false
+					return
+				end
+				local children = deployables:GetChildren()
+				local batchSize = 30
+				local i = 1
+				while i <= #children do
+					if not Config[objectsTable.enabledKey] then
+						scanState.running = false
+						return
+					end
+					local batchEnd = math.min(i + batchSize - 1, #children)
+					for j = i, batchEnd do
+						local child = children[j]
+						if isTargetFn(child) then
+							process(child)
+						end
+					end
+					i = batchEnd + 1
+					task.wait()
+				end
+			end)
+			scanState.running = false
+		end)
+	end
+
+	_G[startFnName] = function()
+		if not Config[objectsTable.enabledKey] then return end
+		scan()
+	end
+
+	_G[clearFnName] = function()
+		for inst, _ in pairs(objectsTable.objects) do
+			removeFn(inst)
+		end
+	end
+end
+
+local baseClaimObjects = {}
+local woodenCrateObjects = {}
+
+local function isBaseClaim(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Base Claim"
+end
+
+local function isWoodenCrate(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Wooden Crate"
+end
+
+local function getModelPosition(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary.Position end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp.Position end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso.Position end
+	local head = inst:FindFirstChild("Head")
+	if head then return head.Position end
+	local part = inst:FindFirstChildWhichIsA("BasePart")
+	if part then return part.Position end
+	return nil
+end
+
+local function getModelAdornee(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp end
+	local head = inst:FindFirstChild("Head")
+	if head then return head end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso end
+	return inst:FindFirstChildWhichIsA("BasePart")
+end
+
+local function makeDeployableESP(objectsTable, name, labelText)
+	local function createFn(inst)
+		if objectsTable[inst] then return end
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "QVIZI_" .. name
+		bb.Size = UDim2.new(0, 200, 0, 40)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+		bb.AlwaysOnTop = true
+		bb.LightInfluence = 0
+		bb.MaxDistance = 5000
+		bb.Enabled = false
+		bb.Parent = LP:WaitForChild("PlayerGui")
+
+		local nameLbl = Instance.new("TextLabel", bb)
+		nameLbl.Size = UDim2.new(1, 0, 0, 22)
+		nameLbl.Position = UDim2.new(0, 0, 0, 0)
+		nameLbl.BackgroundTransparency = 1
+		nameLbl.Text = labelText
+		nameLbl.TextColor3 = Config.ESPColor
+		nameLbl.Font = Enum.Font.GothamBold
+		nameLbl.TextSize = 15
+		nameLbl.TextStrokeTransparency = 0
+		nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local distLbl = Instance.new("TextLabel", bb)
+		distLbl.Size = UDim2.new(1, 0, 0, 18)
+		distLbl.Position = UDim2.new(0, 0, 0, 24)
+		distLbl.BackgroundTransparency = 1
+		distLbl.Text = ""
+		distLbl.TextColor3 = Config.ESPColor
+		distLbl.Font = Enum.Font.GothamBold
+		distLbl.TextSize = 14
+		distLbl.TextStrokeTransparency = 0
+		distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "QVIZI_" .. name .. "HL"
+		highlight.FillColor = Config.ESPColor
+		highlight.OutlineColor = Config.ESPColor
+		highlight.FillTransparency = 0.6
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+		highlight.Adornee = nil
+		highlight.Enabled = false
+		highlight.Parent = LP:WaitForChild("PlayerGui")
+
+		objectsTable[inst] = {
+			bb = bb,
+			nameLbl = nameLbl,
+			distLbl = distLbl,
+			highlight = highlight,
+		}
+	end
+
+	local function removeFn(inst)
+		if objectsTable[inst] then
+			pcall(function() objectsTable[inst].bb:Destroy() end)
+			pcall(function() objectsTable[inst].highlight:Destroy() end)
+			objectsTable[inst] = nil
+		end
+	end
+
+	return createFn, removeFn
+end
+
+local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim")
+local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate")
+
+local bcScanState = { running = false }
+local wcScanState = { running = false }
+
+local function scanDeployables(tbl, isTargetFn, createFn, state)
+	if not Config[tbl.enabledKey] then return end
+	if state.running then return end
+	state.running = true
+	task.spawn(function()
+		pcall(function()
+			local root = workspace:FindFirstChild("PlayerBuiltStructures")
+			if not root then
+				state.running = false
+				return
+			end
+			local deployables = root:FindFirstChild("Deployables")
+			if not deployables then
+				state.running = false
+				return
+			end
+			local children = deployables:GetChildren()
+			local batchSize = 30
+			local i = 1
+			while i <= #children do
+				if not Config[tbl.enabledKey] then
+					state.running = false
+					return
+				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isTargetFn(child) then
+						if not tbl.objects[child] then
+							createFn(child)
+						end
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
+			end
+		end)
+		state.running = false
+	end)
+end
+
+local baseClaimTbl = { objects = baseClaimObjects, enabledKey = "BaseClaimESP" }
+local woodenCrateTbl = { objects = woodenCrateObjects, enabledKey = "WoodenCrateESP" }
+
+_G.QVIZI_START_BC_SCAN = function()
+	if not Config.BaseClaimESP then return end
+	scanDeployables(baseClaimTbl, isBaseClaim, createBaseClaimESP, bcScanState)
+end
+
+_G.QVIZI_CLEAR_BC = function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+end
+
+_G.QVIZI_START_WC_SCAN = function()
+	if not Config.WoodenCrateESP then return end
+	scanDeployables(woodenCrateTbl, isWoodenCrate, createWoodenCrateESP, wcScanState)
+end
+
+_G.QVIZI_CLEAR_WC = function()
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+end
+
+registerCleanup(function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+end)
+
 local bodyBagObjects = {}
-local bodyBagPending = {}
 
 local function isBodyBag(inst)
 	if not inst or not inst:IsA("Model") then return false end
@@ -1564,32 +1951,6 @@ local function getOwnerName(inst)
 	return nil
 end
 
-local function getBodyBagPosition(inst)
-	local primary = inst.PrimaryPart
-	if primary then return primary.Position end
-	local hrp = inst:FindFirstChild("HumanoidRootPart")
-	if hrp then return hrp.Position end
-	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
-	if torso then return torso.Position end
-	local head = inst:FindFirstChild("Head")
-	if head then return head.Position end
-	local part = inst:FindFirstChildWhichIsA("BasePart")
-	if part then return part.Position end
-	return nil
-end
-
-local function getBodyBagAdornee(inst)
-	local primary = inst.PrimaryPart
-	if primary then return primary end
-	local hrp = inst:FindFirstChild("HumanoidRootPart")
-	if hrp then return hrp end
-	local head = inst:FindFirstChild("Head")
-	if head then return head end
-	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
-	if torso then return torso end
-	return inst:FindFirstChildWhichIsA("BasePart")
-end
-
 local function createBodyBagESP(inst)
 	if bodyBagObjects[inst] then return end
 	if not isBodyBag(inst) then return end
@@ -1609,7 +1970,7 @@ local function createBodyBagESP(inst)
 	ownerLbl.Position = UDim2.new(0, 0, 0, 0)
 	ownerLbl.BackgroundTransparency = 1
 	ownerLbl.Text = ""
-	ownerLbl.TextColor3 = Color3.fromRGB(255, 90, 200)
+	ownerLbl.TextColor3 = Config.ESPColor
 	ownerLbl.Font = Enum.Font.GothamBold
 	ownerLbl.TextSize = 15
 	ownerLbl.TextStrokeTransparency = 0
@@ -1620,7 +1981,7 @@ local function createBodyBagESP(inst)
 	distLbl.Position = UDim2.new(0, 0, 0, 24)
 	distLbl.BackgroundTransparency = 1
 	distLbl.Text = ""
-	distLbl.TextColor3 = Color3.fromRGB(190, 60, 255)
+	distLbl.TextColor3 = Config.ESPColor
 	distLbl.Font = Enum.Font.GothamBold
 	distLbl.TextSize = 14
 	distLbl.TextStrokeTransparency = 0
@@ -1628,8 +1989,8 @@ local function createBodyBagESP(inst)
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "QVIZI_BodyBagHL"
-	highlight.FillColor = Color3.fromRGB(255, 90, 200)
-	highlight.OutlineColor = Color3.fromRGB(190, 60, 255)
+	highlight.FillColor = Config.ESPColor
+	highlight.OutlineColor = Config.ESPColor
 	highlight.FillTransparency = 0.6
 	highlight.OutlineTransparency = 0
 	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
@@ -1653,12 +2014,9 @@ local function removeBodyBagESP(inst)
 		pcall(function() bodyBagObjects[inst].highlight:Destroy() end)
 		bodyBagObjects[inst] = nil
 	end
-	bodyBagPending[inst] = nil
 end
 
-local scanState = {
-	running = false,
-}
+local bbScanState = { running = false }
 
 local function processBodyBag(inst)
 	if not Config.BodyBagESP then return end
@@ -1668,19 +2026,19 @@ local function processBodyBag(inst)
 	createBodyBagESP(inst)
 end
 
-local function scanViaRootChildren()
+local function scanBodyBags()
 	if not Config.BodyBagESP then return end
-	if scanState.running then return end
-	scanState.running = true
+	if bbScanState.running then return end
+	bbScanState.running = true
 
 	task.spawn(function()
-		local ok, err = pcall(function()
+		pcall(function()
 			local children = workspace:GetChildren()
 			local batchSize = 50
 			local i = 1
 			while i <= #children do
 				if not Config.BodyBagESP then
-					scanState.running = false
+					bbScanState.running = false
 					return
 				end
 				local batchEnd = math.min(i + batchSize - 1, #children)
@@ -1694,16 +2052,13 @@ local function scanViaRootChildren()
 				task.wait()
 			end
 		end)
-		if not ok then
-			warn("[QVIZI] BodyBag scan error:", err)
-		end
-		scanState.running = false
+		bbScanState.running = false
 	end)
 end
 
 _G.QVIZI_START_BB_SCAN = function()
 	if not Config.BodyBagESP then return end
-	scanViaRootChildren()
+	scanBodyBags()
 end
 
 _G.QVIZI_CLEAR_BB = function()
@@ -1712,32 +2067,179 @@ _G.QVIZI_CLEAR_BB = function()
 	end
 end
 
+local sleeperObjects = {}
+
+local function isSleeper(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	local n = string.lower(inst.Name)
+	return string.find(n, "sleeper", 1, true) ~= nil
+end
+
+local function createSleeperESP(inst)
+	if sleeperObjects[inst] then return end
+	if not isSleeper(inst) then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_Sleeper"
+	bb.Size = UDim2.new(0, 200, 0, 50)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local nameLbl = Instance.new("TextLabel", bb)
+	nameLbl.Size = UDim2.new(1, 0, 0, 22)
+	nameLbl.Position = UDim2.new(0, 0, 0, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = "[Offline]"
+	nameLbl.TextColor3 = Config.ESPColor
+	nameLbl.Font = Enum.Font.GothamBold
+	nameLbl.TextSize = 15
+	nameLbl.TextStrokeTransparency = 0
+	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 18)
+	distLbl.Position = UDim2.new(0, 0, 0, 24)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Config.ESPColor
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 14
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_SleeperHL"
+	highlight.FillColor = Config.ESPColor
+	highlight.OutlineColor = Config.ESPColor
+	highlight.FillTransparency = 0.6
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.Adornee = nil
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	sleeperObjects[inst] = {
+		bb = bb,
+		nameLbl = nameLbl,
+		distLbl = distLbl,
+		highlight = highlight,
+	}
+end
+
+local function removeSleeperESP(inst)
+	if sleeperObjects[inst] then
+		pcall(function() sleeperObjects[inst].bb:Destroy() end)
+		pcall(function() sleeperObjects[inst].highlight:Destroy() end)
+		sleeperObjects[inst] = nil
+	end
+end
+
+local slScanState = { running = false }
+
+local function processSleeper(inst)
+	if not Config.SleeperESP then return end
+	if sleeperObjects[inst] then return end
+	if not inst.Parent then return end
+	if not isSleeper(inst) then return end
+	createSleeperESP(inst)
+end
+
+local function scanSleepers()
+	if not Config.SleeperESP then return end
+	if slScanState.running then return end
+	slScanState.running = true
+
+	task.spawn(function()
+		pcall(function()
+			local children = workspace:GetChildren()
+			local batchSize = 50
+			local i = 1
+			while i <= #children do
+				if not Config.SleeperESP then
+					slScanState.running = false
+					return
+				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isSleeper(child) then
+						processSleeper(child)
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
+			end
+		end)
+		slScanState.running = false
+	end)
+end
+
+_G.QVIZI_START_SL_SCAN = function()
+	if not Config.SleeperESP then return end
+	scanSleepers()
+end
+
+_G.QVIZI_CLEAR_SL = function()
+	for inst, _ in pairs(sleeperObjects) do
+		removeSleeperESP(inst)
+	end
+end
+
 local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
-	if not Config.BodyBagESP then return end
 	if not inst:IsA("Model") then return end
 	local n = string.lower(inst.Name)
-	if not string.find(n, "bodybag", 1, true) then return end
-	task.defer(function()
-		if not Config.BodyBagESP then return end
-		processBodyBag(inst)
-	end)
+	if Config.BodyBagESP and string.find(n, "bodybag", 1, true) then
+		task.defer(function()
+			if not Config.BodyBagESP then return end
+			processBodyBag(inst)
+		end)
+	end
+	if Config.SleeperESP and string.find(n, "sleeper", 1, true) then
+		task.defer(function()
+			if not Config.SleeperESP then return end
+			processSleeper(inst)
+		end)
+	end
+	if Config.BaseClaimESP and inst.Name == "Base Claim" then
+		task.defer(function()
+			if not Config.BaseClaimESP then return end
+			if not baseClaimObjects[inst] then
+				createBaseClaimESP(inst)
+			end
+		end)
+	end
+	if Config.WoodenCrateESP and inst.Name == "Wooden Crate" then
+		task.defer(function()
+			if not Config.WoodenCrateESP then return end
+			if not woodenCrateObjects[inst] then
+				createWoodenCrateESP(inst)
+			end
+		end)
+	end
 end)
 
 local descRemovedConn = workspace.DescendantRemoving:Connect(function(inst)
 	if bodyBagObjects[inst] then
 		removeBodyBagESP(inst)
 	end
+	if sleeperObjects[inst] then
+		removeSleeperESP(inst)
+	end
+	if baseClaimObjects[inst] then
+		removeBaseClaimESP(inst)
+	end
+	if woodenCrateObjects[inst] then
+		removeWoodenCrateESP(inst)
+	end
 end)
 
 registerCleanup(function()
 	if descAddedConn then descAddedConn:Disconnect() end
 	if descRemovedConn then descRemovedConn:Disconnect() end
-end)
-
-registerCleanup(function()
-	for inst, _ in pairs(bodyBagObjects) do
-		removeBodyBagESP(inst)
-	end
 end)
 
 local function isVisible(targetChar)
@@ -1901,14 +2403,16 @@ local renderConn = RunService.RenderStepped:Connect(function()
 			continue
 		end
 
-		local pos = getBodyBagPosition(inst)
-		local adornee = getBodyBagAdornee(inst)
+		local pos = getModelPosition(inst)
+		local adornee = getModelAdornee(inst)
 
 		if pos and adornee then
 			local distance = (Camera.CFrame.Position - pos).Magnitude
 			if distance <= Config.BodyBagMaxDist then
 				objs.bb.Adornee = adornee
 				objs.bb.Enabled = true
+
+				local col = Config.ESPColor
 
 				if Config.BodyBagOwner then
 					local now = tick()
@@ -1917,10 +2421,11 @@ local renderConn = RunService.RenderStepped:Connect(function()
 						objs.lastOwnerCheck = now
 					end
 					objs.ownerLbl.Visible = true
+					objs.ownerLbl.TextColor3 = col
 					if objs.cachedOwner then
-						objs.ownerLbl.Text = objs.cachedOwner
+						objs.ownerLbl.Text = "BodyBag: "..objs.cachedOwner
 					else
-						objs.ownerLbl.Text = "BodyBag"
+						objs.ownerLbl.Text = "Unknown Body Bag"
 					end
 				else
 					objs.ownerLbl.Visible = false
@@ -1928,6 +2433,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 
 				if Config.BodyBagDistance then
 					objs.distLbl.Visible = true
+					objs.distLbl.TextColor3 = col
 					objs.distLbl.Text = string.format("%dm", math.floor(distance))
 				else
 					objs.distLbl.Visible = false
@@ -1935,8 +2441,152 @@ local renderConn = RunService.RenderStepped:Connect(function()
 
 				objs.highlight.Adornee = inst
 				objs.highlight.Enabled = true
-				objs.highlight.FillColor = Color3.fromRGB(255, 90, 200)
-				objs.highlight.OutlineColor = Color3.fromRGB(190, 60, 255)
+				objs.highlight.FillColor = col
+				objs.highlight.OutlineColor = col
+			else
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
+	for inst, objs in pairs(sleeperObjects) do
+		if not inst.Parent then
+			removeSleeperESP(inst)
+			continue
+		end
+
+		if not Config.SleeperESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
+		local pos = getModelPosition(inst)
+		local adornee = getModelAdornee(inst)
+
+		if pos and adornee then
+			local distance = (Camera.CFrame.Position - pos).Magnitude
+			if distance <= Config.SleeperMaxDist then
+				objs.bb.Adornee = adornee
+				objs.bb.Enabled = true
+
+				local col = Config.ESPColor
+
+				objs.nameLbl.TextColor3 = col
+				if Config.SleeperDistance then
+					objs.distLbl.Visible = true
+					objs.distLbl.TextColor3 = col
+					objs.distLbl.Text = string.format("%dm", math.floor(distance))
+				else
+					objs.distLbl.Visible = false
+				end
+
+				objs.highlight.Adornee = inst
+				objs.highlight.Enabled = true
+				objs.highlight.FillColor = col
+				objs.highlight.OutlineColor = col
+			else
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
+	for inst, objs in pairs(baseClaimObjects) do
+		if not inst.Parent then
+			removeBaseClaimESP(inst)
+			continue
+		end
+
+		if not Config.BaseClaimESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
+		local pos = getModelPosition(inst)
+		local adornee = getModelAdornee(inst)
+
+		if pos and adornee then
+			local distance = (Camera.CFrame.Position - pos).Magnitude
+			if distance <= Config.BaseClaimMaxDist then
+				objs.bb.Adornee = adornee
+				objs.bb.Enabled = true
+
+				local col = Config.ESPColor
+				objs.nameLbl.TextColor3 = col
+
+				if Config.BaseClaimDistance then
+					objs.distLbl.Visible = true
+					objs.distLbl.TextColor3 = col
+					objs.distLbl.Text = string.format("%dm", math.floor(distance))
+				else
+					objs.distLbl.Visible = false
+				end
+
+				objs.highlight.Adornee = inst
+				objs.highlight.Enabled = true
+				objs.highlight.FillColor = col
+				objs.highlight.OutlineColor = col
+			else
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
+	for inst, objs in pairs(woodenCrateObjects) do
+		if not inst.Parent then
+			removeWoodenCrateESP(inst)
+			continue
+		end
+
+		if not Config.WoodenCrateESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
+		local pos = getModelPosition(inst)
+		local adornee = getModelAdornee(inst)
+
+		if pos and adornee then
+			local distance = (Camera.CFrame.Position - pos).Magnitude
+			if distance <= Config.WoodenCrateMaxDist then
+				objs.bb.Adornee = adornee
+				objs.bb.Enabled = true
+
+				local col = Config.ESPColor
+				objs.nameLbl.TextColor3 = col
+
+				if Config.WoodenCrateDistance then
+					objs.distLbl.Visible = true
+					objs.distLbl.TextColor3 = col
+					objs.distLbl.Text = string.format("%dm", math.floor(distance))
+				else
+					objs.distLbl.Visible = false
+				end
+
+				objs.highlight.Adornee = inst
+				objs.highlight.Enabled = true
+				objs.highlight.FillColor = col
+				objs.highlight.OutlineColor = col
 			else
 				objs.bb.Enabled = false
 				objs.highlight.Enabled = false
@@ -2023,8 +2673,17 @@ task.spawn(function()
 	end
 	task.wait(0.2)
 	createMenu()
+	task.wait(1)
 	if Config.BodyBagESP and _G.QVIZI_START_BB_SCAN then
-		task.wait(1)
 		_G.QVIZI_START_BB_SCAN()
+	end
+	if Config.SleeperESP and _G.QVIZI_START_SL_SCAN then
+		_G.QVIZI_START_SL_SCAN()
+	end
+	if Config.BaseClaimESP and _G.QVIZI_START_BC_SCAN then
+		_G.QVIZI_START_BC_SCAN()
+	end
+	if Config.WoodenCrateESP and _G.QVIZI_START_WC_SCAN then
+		_G.QVIZI_START_WC_SCAN()
 	end
 end)
