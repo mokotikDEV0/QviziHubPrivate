@@ -22,7 +22,7 @@ if _G.QVIZI_LOADED then
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.2"
+local VERSION = "V1.3"
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
@@ -67,15 +67,23 @@ local Config = {
 	BodyBagOwner = true,
 	BodyBagDistance = true,
 	BodyBagMaxDist = 5000,
+	BodyBagColor = Color3.fromRGB(255, 90, 200),
+	BodyBagUseCustom = false,
 	SleeperESP = false,
 	SleeperDistance = true,
 	SleeperMaxDist = 5000,
+	SleeperColor = Color3.fromRGB(180, 180, 190),
+	SleeperUseCustom = false,
 	BaseClaimESP = false,
 	BaseClaimDistance = true,
 	BaseClaimMaxDist = 5000,
+	BaseClaimColor = Color3.fromRGB(255, 200, 90),
+	BaseClaimUseCustom = false,
 	WoodenCrateESP = false,
 	WoodenCrateDistance = true,
 	WoodenCrateMaxDist = 5000,
+	WoodenCrateColor = Color3.fromRGB(200, 150, 90),
+	WoodenCrateUseCustom = false,
 }
 
 local DEFAULT_SPEED = 16
@@ -112,6 +120,14 @@ local function hasFs()
 	return type(writefile) == "function" and type(isfile) == "function" and type(readfile) == "function"
 end
 
+local COLOR_KEYS = {
+	ESPColor = true,
+	BodyBagColor = true,
+	SleeperColor = true,
+	BaseClaimColor = true,
+	WoodenCrateColor = true,
+}
+
 local function loadCfg()
 	if not hasFs() then return end
 	pcall(function()
@@ -120,8 +136,8 @@ local function loadCfg()
 			if type(data) == "table" then
 				for k, v in pairs(data) do
 					if Config[k] ~= nil then
-						if k == "ESPColor" and type(v) == "table" then
-							Config.ESPColor = Color3.new(v[1], v[2], v[3])
+						if COLOR_KEYS[k] and type(v) == "table" then
+							Config[k] = Color3.new(v[1], v[2], v[3])
 						else
 							Config[k] = v
 						end
@@ -988,11 +1004,14 @@ local function createMenu()
 	end)
 	makeToggle(farmPage, "Show Owner", 74, "BodyBagOwner")
 	makeToggle(farmPage, "Show Distance", 118, "BodyBagDistance")
-	makeSlider(farmPage, "Max Distance", 168, 1, 10000, "BodyBagMaxDist", "m")
+	makeToggle(farmPage, "Use Custom Color", 162, "BodyBagUseCustom")
+	makeSlider(farmPage, "Max Distance", 212, 1, 10000, "BodyBagMaxDist", "m")
+
+	local bbColorBox = makeColorPicker(farmPage, 276, "BodyBagColor", "BodyBag Color")
 
 	local slSectionLbl = Instance.new("TextLabel", farmPage)
 	slSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	slSectionLbl.Position = UDim2.new(0, 0, 0, 232)
+	slSectionLbl.Position = UDim2.new(0, 0, 0, 374)
 	slSectionLbl.BackgroundTransparency = 1
 	slSectionLbl.Text = "Sleeping Players"
 	slSectionLbl.TextColor3 = THEME.TEXT
@@ -1000,7 +1019,7 @@ local function createMenu()
 	slSectionLbl.TextSize = 14
 	slSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-	local slToggleRow = makeToggle(farmPage, "Enable Sleeper ESP", 262, "SleeperESP")
+	local slToggleRow = makeToggle(farmPage, "Enable Sleeper ESP", 404, "SleeperESP")
 	task.spawn(function()
 		local slBtn = nil
 		for _, c in ipairs(slToggleRow:GetDescendants()) do
@@ -1020,12 +1039,15 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Distance", 306, "SleeperDistance")
-	makeSlider(farmPage, "Max Distance", 356, 1, 10000, "SleeperMaxDist", "m")
+	makeToggle(farmPage, "Show Distance", 448, "SleeperDistance")
+	makeToggle(farmPage, "Use Custom Color", 492, "SleeperUseCustom")
+	makeSlider(farmPage, "Max Distance", 542, 1, 10000, "SleeperMaxDist", "m")
+
+	local slColorBox = makeColorPicker(farmPage, 606, "SleeperColor", "Sleeper Color")
 
 	local bcSectionLbl = Instance.new("TextLabel", farmPage)
 	bcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	bcSectionLbl.Position = UDim2.new(0, 0, 0, 420)
+	bcSectionLbl.Position = UDim2.new(0, 0, 0, 704)
 	bcSectionLbl.BackgroundTransparency = 1
 	bcSectionLbl.Text = "Base Claim"
 	bcSectionLbl.TextColor3 = THEME.TEXT
@@ -1033,7 +1055,7 @@ local function createMenu()
 	bcSectionLbl.TextSize = 14
 	bcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 450, "BaseClaimESP")
+	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 734, "BaseClaimESP")
 	task.spawn(function()
 		local bcBtn = nil
 		for _, c in ipairs(bcToggleRow:GetDescendants()) do
@@ -1053,12 +1075,15 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Distance", 494, "BaseClaimDistance")
-	makeSlider(farmPage, "Max Distance", 544, 1, 10000, "BaseClaimMaxDist", "m")
+	makeToggle(farmPage, "Show Distance", 778, "BaseClaimDistance")
+	makeToggle(farmPage, "Use Custom Color", 822, "BaseClaimUseCustom")
+	makeSlider(farmPage, "Max Distance", 872, 1, 10000, "BaseClaimMaxDist", "m")
+
+	local bcColorBox = makeColorPicker(farmPage, 936, "BaseClaimColor", "Base Claim Color")
 
 	local wcSectionLbl = Instance.new("TextLabel", farmPage)
 	wcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	wcSectionLbl.Position = UDim2.new(0, 0, 0, 608)
+	wcSectionLbl.Position = UDim2.new(0, 0, 0, 1034)
 	wcSectionLbl.BackgroundTransparency = 1
 	wcSectionLbl.Text = "Wooden Crate"
 	wcSectionLbl.TextColor3 = THEME.TEXT
@@ -1066,7 +1091,7 @@ local function createMenu()
 	wcSectionLbl.TextSize = 14
 	wcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 638, "WoodenCrateESP")
+	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 1064, "WoodenCrateESP")
 	task.spawn(function()
 		local wcBtn = nil
 		for _, c in ipairs(wcToggleRow:GetDescendants()) do
@@ -1086,10 +1111,13 @@ local function createMenu()
 			end)
 		end
 	end)
-	makeToggle(farmPage, "Show Distance", 682, "WoodenCrateDistance")
-	makeSlider(farmPage, "Max Distance", 732, 1, 10000, "WoodenCrateMaxDist", "m")
+	makeToggle(farmPage, "Show Distance", 1108, "WoodenCrateDistance")
+	makeToggle(farmPage, "Use Custom Color", 1152, "WoodenCrateUseCustom")
+	makeSlider(farmPage, "Max Distance", 1202, 1, 10000, "WoodenCrateMaxDist", "m")
 
-	farmPage.CanvasSize = UDim2.new(0, 0, 0, 830)
+	local wcColorBox = makeColorPicker(farmPage, 1266, "WoodenCrateColor", "Wooden Crate Color")
+
+	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1370)
 
 	local setPage = pages["Settings"]
 	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
@@ -1204,15 +1232,23 @@ local function createMenu()
 		Config.BodyBagOwner = true
 		Config.BodyBagDistance = true
 		Config.BodyBagMaxDist = 5000
+		Config.BodyBagColor = Color3.fromRGB(255, 90, 200)
+		Config.BodyBagUseCustom = false
 		Config.SleeperESP = false
 		Config.SleeperDistance = true
 		Config.SleeperMaxDist = 5000
+		Config.SleeperColor = Color3.fromRGB(180, 180, 190)
+		Config.SleeperUseCustom = false
 		Config.BaseClaimESP = false
 		Config.BaseClaimDistance = true
 		Config.BaseClaimMaxDist = 5000
+		Config.BaseClaimColor = Color3.fromRGB(255, 200, 90)
+		Config.BaseClaimUseCustom = false
 		Config.WoodenCrateESP = false
 		Config.WoodenCrateDistance = true
 		Config.WoodenCrateMaxDist = 5000
+		Config.WoodenCrateColor = Color3.fromRGB(200, 150, 90)
+		Config.WoodenCrateUseCustom = false
 		saveCfg()
 	end)
 
@@ -1639,7 +1675,7 @@ local function createESP(plr)
 	highlight.OutlineColor = THEME.ACCENT
 	highlight.FillTransparency = 0.6
 	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Adornee = nil
 	highlight.Enabled = false
 	highlight.Parent = LP:WaitForChild("PlayerGui")
@@ -1676,81 +1712,6 @@ for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 
 Players.PlayerRemoving:Connect(removeESP)
 
-local function makeSimpleESP(isTargetFn, createFn, removeFn, scanFn, startFnName, clearFnName, objectsTable, maxDistKey, distanceKey)
-	local scanState = { running = false }
-
-	local function process(inst)
-		if not Config[objectsTable.enabledKey] then return end
-		if objectsTable.objects[inst] then return end
-		if not inst.Parent then return end
-		if not isTargetFn(inst) then return end
-		createFn(inst)
-	end
-
-	local function scan()
-		if not Config[objectsTable.enabledKey] then return end
-		if scanState.running then return end
-		scanState.running = true
-		task.spawn(function()
-			pcall(function()
-				local root = workspace:FindFirstChild("PlayerBuiltStructures")
-				if not root then
-					scanState.running = false
-					return
-				end
-				local deployables = root:FindFirstChild("Deployables")
-				if not deployables then
-					scanState.running = false
-					return
-				end
-				local children = deployables:GetChildren()
-				local batchSize = 30
-				local i = 1
-				while i <= #children do
-					if not Config[objectsTable.enabledKey] then
-						scanState.running = false
-						return
-					end
-					local batchEnd = math.min(i + batchSize - 1, #children)
-					for j = i, batchEnd do
-						local child = children[j]
-						if isTargetFn(child) then
-							process(child)
-						end
-					end
-					i = batchEnd + 1
-					task.wait()
-				end
-			end)
-			scanState.running = false
-		end)
-	end
-
-	_G[startFnName] = function()
-		if not Config[objectsTable.enabledKey] then return end
-		scan()
-	end
-
-	_G[clearFnName] = function()
-		for inst, _ in pairs(objectsTable.objects) do
-			removeFn(inst)
-		end
-	end
-end
-
-local baseClaimObjects = {}
-local woodenCrateObjects = {}
-
-local function isBaseClaim(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	return inst.Name == "Base Claim"
-end
-
-local function isWoodenCrate(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	return inst.Name == "Wooden Crate"
-end
-
 local function getModelPosition(inst)
 	local primary = inst.PrimaryPart
 	if primary then return primary.Position end
@@ -1776,152 +1737,6 @@ local function getModelAdornee(inst)
 	if torso then return torso end
 	return inst:FindFirstChildWhichIsA("BasePart")
 end
-
-local function makeDeployableESP(objectsTable, name, labelText)
-	local function createFn(inst)
-		if objectsTable[inst] then return end
-		local bb = Instance.new("BillboardGui")
-		bb.Name = "QVIZI_" .. name
-		bb.Size = UDim2.new(0, 200, 0, 40)
-		bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
-		bb.AlwaysOnTop = true
-		bb.LightInfluence = 0
-		bb.MaxDistance = 5000
-		bb.Enabled = false
-		bb.Parent = LP:WaitForChild("PlayerGui")
-
-		local nameLbl = Instance.new("TextLabel", bb)
-		nameLbl.Size = UDim2.new(1, 0, 0, 22)
-		nameLbl.Position = UDim2.new(0, 0, 0, 0)
-		nameLbl.BackgroundTransparency = 1
-		nameLbl.Text = labelText
-		nameLbl.TextColor3 = Config.ESPColor
-		nameLbl.Font = Enum.Font.GothamBold
-		nameLbl.TextSize = 15
-		nameLbl.TextStrokeTransparency = 0
-		nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-		local distLbl = Instance.new("TextLabel", bb)
-		distLbl.Size = UDim2.new(1, 0, 0, 18)
-		distLbl.Position = UDim2.new(0, 0, 0, 24)
-		distLbl.BackgroundTransparency = 1
-		distLbl.Text = ""
-		distLbl.TextColor3 = Config.ESPColor
-		distLbl.Font = Enum.Font.GothamBold
-		distLbl.TextSize = 14
-		distLbl.TextStrokeTransparency = 0
-		distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "QVIZI_" .. name .. "HL"
-		highlight.FillColor = Config.ESPColor
-		highlight.OutlineColor = Config.ESPColor
-		highlight.FillTransparency = 0.6
-		highlight.OutlineTransparency = 0
-		highlight.DepthMode = Enum.HighlightDepthMode.Occluded
-		highlight.Adornee = nil
-		highlight.Enabled = false
-		highlight.Parent = LP:WaitForChild("PlayerGui")
-
-		objectsTable[inst] = {
-			bb = bb,
-			nameLbl = nameLbl,
-			distLbl = distLbl,
-			highlight = highlight,
-		}
-	end
-
-	local function removeFn(inst)
-		if objectsTable[inst] then
-			pcall(function() objectsTable[inst].bb:Destroy() end)
-			pcall(function() objectsTable[inst].highlight:Destroy() end)
-			objectsTable[inst] = nil
-		end
-	end
-
-	return createFn, removeFn
-end
-
-local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim")
-local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate")
-
-local bcScanState = { running = false }
-local wcScanState = { running = false }
-
-local function scanDeployables(tbl, isTargetFn, createFn, state)
-	if not Config[tbl.enabledKey] then return end
-	if state.running then return end
-	state.running = true
-	task.spawn(function()
-		pcall(function()
-			local root = workspace:FindFirstChild("PlayerBuiltStructures")
-			if not root then
-				state.running = false
-				return
-			end
-			local deployables = root:FindFirstChild("Deployables")
-			if not deployables then
-				state.running = false
-				return
-			end
-			local children = deployables:GetChildren()
-			local batchSize = 30
-			local i = 1
-			while i <= #children do
-				if not Config[tbl.enabledKey] then
-					state.running = false
-					return
-				end
-				local batchEnd = math.min(i + batchSize - 1, #children)
-				for j = i, batchEnd do
-					local child = children[j]
-					if isTargetFn(child) then
-						if not tbl.objects[child] then
-							createFn(child)
-						end
-					end
-				end
-				i = batchEnd + 1
-				task.wait()
-			end
-		end)
-		state.running = false
-	end)
-end
-
-local baseClaimTbl = { objects = baseClaimObjects, enabledKey = "BaseClaimESP" }
-local woodenCrateTbl = { objects = woodenCrateObjects, enabledKey = "WoodenCrateESP" }
-
-_G.QVIZI_START_BC_SCAN = function()
-	if not Config.BaseClaimESP then return end
-	scanDeployables(baseClaimTbl, isBaseClaim, createBaseClaimESP, bcScanState)
-end
-
-_G.QVIZI_CLEAR_BC = function()
-	for inst, _ in pairs(baseClaimObjects) do
-		removeBaseClaimESP(inst)
-	end
-end
-
-_G.QVIZI_START_WC_SCAN = function()
-	if not Config.WoodenCrateESP then return end
-	scanDeployables(woodenCrateTbl, isWoodenCrate, createWoodenCrateESP, wcScanState)
-end
-
-_G.QVIZI_CLEAR_WC = function()
-	for inst, _ in pairs(woodenCrateObjects) do
-		removeWoodenCrateESP(inst)
-	end
-end
-
-registerCleanup(function()
-	for inst, _ in pairs(baseClaimObjects) do
-		removeBaseClaimESP(inst)
-	end
-	for inst, _ in pairs(woodenCrateObjects) do
-		removeWoodenCrateESP(inst)
-	end
-end)
 
 local bodyBagObjects = {}
 
@@ -1970,7 +1785,7 @@ local function createBodyBagESP(inst)
 	ownerLbl.Position = UDim2.new(0, 0, 0, 0)
 	ownerLbl.BackgroundTransparency = 1
 	ownerLbl.Text = ""
-	ownerLbl.TextColor3 = Config.ESPColor
+	ownerLbl.TextColor3 = Config.BodyBagColor
 	ownerLbl.Font = Enum.Font.GothamBold
 	ownerLbl.TextSize = 15
 	ownerLbl.TextStrokeTransparency = 0
@@ -1981,7 +1796,7 @@ local function createBodyBagESP(inst)
 	distLbl.Position = UDim2.new(0, 0, 0, 24)
 	distLbl.BackgroundTransparency = 1
 	distLbl.Text = ""
-	distLbl.TextColor3 = Config.ESPColor
+	distLbl.TextColor3 = Config.BodyBagColor
 	distLbl.Font = Enum.Font.GothamBold
 	distLbl.TextSize = 14
 	distLbl.TextStrokeTransparency = 0
@@ -1989,11 +1804,11 @@ local function createBodyBagESP(inst)
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "QVIZI_BodyBagHL"
-	highlight.FillColor = Config.ESPColor
-	highlight.OutlineColor = Config.ESPColor
+	highlight.FillColor = Config.BodyBagColor
+	highlight.OutlineColor = Config.BodyBagColor
 	highlight.FillTransparency = 0.6
 	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Adornee = nil
 	highlight.Enabled = false
 	highlight.Parent = LP:WaitForChild("PlayerGui")
@@ -2094,7 +1909,7 @@ local function createSleeperESP(inst)
 	nameLbl.Position = UDim2.new(0, 0, 0, 0)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.Text = "[Offline]"
-	nameLbl.TextColor3 = Config.ESPColor
+	nameLbl.TextColor3 = Config.SleeperColor
 	nameLbl.Font = Enum.Font.GothamBold
 	nameLbl.TextSize = 15
 	nameLbl.TextStrokeTransparency = 0
@@ -2105,7 +1920,7 @@ local function createSleeperESP(inst)
 	distLbl.Position = UDim2.new(0, 0, 0, 24)
 	distLbl.BackgroundTransparency = 1
 	distLbl.Text = ""
-	distLbl.TextColor3 = Config.ESPColor
+	distLbl.TextColor3 = Config.SleeperColor
 	distLbl.Font = Enum.Font.GothamBold
 	distLbl.TextSize = 14
 	distLbl.TextStrokeTransparency = 0
@@ -2113,11 +1928,11 @@ local function createSleeperESP(inst)
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "QVIZI_SleeperHL"
-	highlight.FillColor = Config.ESPColor
-	highlight.OutlineColor = Config.ESPColor
+	highlight.FillColor = Config.SleeperColor
+	highlight.OutlineColor = Config.SleeperColor
 	highlight.FillTransparency = 0.6
 	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Adornee = nil
 	highlight.Enabled = false
 	highlight.Parent = LP:WaitForChild("PlayerGui")
@@ -2188,6 +2003,171 @@ _G.QVIZI_CLEAR_SL = function()
 		removeSleeperESP(inst)
 	end
 end
+
+local baseClaimObjects = {}
+local woodenCrateObjects = {}
+
+local function isBaseClaim(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Base Claim"
+end
+
+local function isWoodenCrate(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Wooden Crate"
+end
+
+local function makeDeployableESP(objectsTable, name, labelText, colorKey)
+	local function createFn(inst)
+		if objectsTable[inst] then return end
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "QVIZI_" .. name
+		bb.Size = UDim2.new(0, 200, 0, 40)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+		bb.AlwaysOnTop = true
+		bb.LightInfluence = 0
+		bb.MaxDistance = 5000
+		bb.Enabled = false
+		bb.Parent = LP:WaitForChild("PlayerGui")
+
+		local nameLbl = Instance.new("TextLabel", bb)
+		nameLbl.Size = UDim2.new(1, 0, 0, 22)
+		nameLbl.Position = UDim2.new(0, 0, 0, 0)
+		nameLbl.BackgroundTransparency = 1
+		nameLbl.Text = labelText
+		nameLbl.TextColor3 = Config[colorKey]
+		nameLbl.Font = Enum.Font.GothamBold
+		nameLbl.TextSize = 15
+		nameLbl.TextStrokeTransparency = 0
+		nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local distLbl = Instance.new("TextLabel", bb)
+		distLbl.Size = UDim2.new(1, 0, 0, 18)
+		distLbl.Position = UDim2.new(0, 0, 0, 24)
+		distLbl.BackgroundTransparency = 1
+		distLbl.Text = ""
+		distLbl.TextColor3 = Config[colorKey]
+		distLbl.Font = Enum.Font.GothamBold
+		distLbl.TextSize = 14
+		distLbl.TextStrokeTransparency = 0
+		distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "QVIZI_" .. name .. "HL"
+		highlight.FillColor = Config[colorKey]
+		highlight.OutlineColor = Config[colorKey]
+		highlight.FillTransparency = 0.6
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Adornee = nil
+		highlight.Enabled = false
+		highlight.Parent = LP:WaitForChild("PlayerGui")
+
+		objectsTable[inst] = {
+			bb = bb,
+			nameLbl = nameLbl,
+			distLbl = distLbl,
+			highlight = highlight,
+		}
+	end
+
+	local function removeFn(inst)
+		if objectsTable[inst] then
+			pcall(function() objectsTable[inst].bb:Destroy() end)
+			pcall(function() objectsTable[inst].highlight:Destroy() end)
+			objectsTable[inst] = nil
+		end
+	end
+
+	return createFn, removeFn
+end
+
+local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim", "BaseClaimColor")
+local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate", "WoodenCrateColor")
+
+local bcScanState = { running = false }
+local wcScanState = { running = false }
+
+local function scanDeployables(tbl, isTargetFn, createFn, state)
+	if not Config[tbl.enabledKey] then return end
+	if state.running then return end
+	state.running = true
+	task.spawn(function()
+		pcall(function()
+			local root = workspace:FindFirstChild("PlayerBuiltStructures")
+			if not root then
+				state.running = false
+				return
+			end
+			local deployables = root:FindFirstChild("Deployables")
+			if not deployables then
+				state.running = false
+				return
+			end
+			local children = deployables:GetChildren()
+			local batchSize = 30
+			local i = 1
+			while i <= #children do
+				if not Config[tbl.enabledKey] then
+					state.running = false
+					return
+				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isTargetFn(child) then
+						if not tbl.objects[child] then
+							createFn(child)
+						end
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
+			end
+		end)
+		state.running = false
+	end)
+end
+
+local baseClaimTbl = { objects = baseClaimObjects, enabledKey = "BaseClaimESP" }
+local woodenCrateTbl = { objects = woodenCrateObjects, enabledKey = "WoodenCrateESP" }
+
+_G.QVIZI_START_BC_SCAN = function()
+	if not Config.BaseClaimESP then return end
+	scanDeployables(baseClaimTbl, isBaseClaim, createBaseClaimESP, bcScanState)
+end
+
+_G.QVIZI_CLEAR_BC = function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+end
+
+_G.QVIZI_START_WC_SCAN = function()
+	if not Config.WoodenCrateESP then return end
+	scanDeployables(woodenCrateTbl, isWoodenCrate, createWoodenCrateESP, wcScanState)
+end
+
+_G.QVIZI_CLEAR_WC = function()
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+end
+
+registerCleanup(function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+	for inst, _ in pairs(bodyBagObjects) do
+		removeBodyBagESP(inst)
+	end
+	for inst, _ in pairs(sleeperObjects) do
+		removeSleeperESP(inst)
+	end
+end)
 
 local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
 	if not inst:IsA("Model") then return end
@@ -2374,7 +2354,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 						objs.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 					else
 						objs.highlight.FillTransparency = 0.75
-						objs.highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+						objs.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 					end
 				else
 					objs.highlight.Enabled = false
@@ -2412,7 +2392,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 				objs.bb.Adornee = adornee
 				objs.bb.Enabled = true
 
-				local col = Config.ESPColor
+				local col = Config.BodyBagUseCustom and Config.BodyBagColor or Config.ESPColor
 
 				if Config.BodyBagOwner then
 					local now = tick()
@@ -2476,7 +2456,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 				objs.bb.Adornee = adornee
 				objs.bb.Enabled = true
 
-				local col = Config.ESPColor
+				local col = Config.SleeperUseCustom and Config.SleeperColor or Config.ESPColor
 
 				objs.nameLbl.TextColor3 = col
 				if Config.SleeperDistance then
@@ -2524,7 +2504,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 				objs.bb.Adornee = adornee
 				objs.bb.Enabled = true
 
-				local col = Config.ESPColor
+				local col = Config.BaseClaimUseCustom and Config.BaseClaimColor or Config.ESPColor
 				objs.nameLbl.TextColor3 = col
 
 				if Config.BaseClaimDistance then
@@ -2572,7 +2552,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 				objs.bb.Adornee = adornee
 				objs.bb.Enabled = true
 
-				local col = Config.ESPColor
+				local col = Config.WoodenCrateUseCustom and Config.WoodenCrateColor or Config.ESPColor
 				objs.nameLbl.TextColor3 = col
 
 				if Config.WoodenCrateDistance then
