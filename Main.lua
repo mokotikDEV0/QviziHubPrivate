@@ -15,18 +15,14 @@ if _G.QVIZI_LOADED then
 		if _G.QVIZI_CLEANUP then _G.QVIZI_CLEANUP() end
 	end)
 	for _, g in ipairs(LP.PlayerGui:GetChildren()) do
-		if g.Name == "QVIZIHUB" or g.Name == "QVIZI_FOV" or g.Name == "QVIZIIntro" or g.Name == "QVIZI_KEY" then
+		if g.Name == "QVIZIHUB" or g.Name == "QVIZI_FOV" or g.Name == "QVIZIIntro" then
 			g:Destroy()
 		end
 	end
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.7"
-
-local KEYS_URL = "https://raw.githubusercontent.com/mokotikDEV0/qvizi-keys/main/keys.json"
-local KEY_FILE = "qvizi_key.txt"
-local SKIP_IF_SAVED = true
+local VERSION = "V1.4"
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
@@ -185,17 +181,6 @@ local function playClick()
 	end)
 end
 
-local function playSound(id, vol)
-	local s = Instance.new("Sound")
-	s.SoundId = id
-	s.Volume = vol or 0.5
-	s.Parent = SoundService
-	s:Play()
-	task.delay(3, function()
-		pcall(function() s:Destroy() end)
-	end)
-end
-
 local cleanupFns = {}
 _G.QVIZI_CLEANUP = function()
 	for _, fn in ipairs(cleanupFns) do
@@ -208,213 +193,12 @@ local function registerCleanup(fn)
 	table.insert(cleanupFns, fn)
 end
 
-local function saveKey(key)
-	if hasFs() then
-		pcall(writefile, KEY_FILE, key)
-	end
-end
-
-local function loadSavedKey()
-	if not hasFs() then return nil end
-	local ok, key = pcall(function()
-		if isfile(KEY_FILE) then
-			return readfile(KEY_FILE)
-		end
-		return nil
-	end)
-	if ok and type(key) == "string" and key ~= "" then
-		return key
-	end
-	return nil
-end
-
-local function fetchKeys()
-	local ok, res = pcall(function()
-		return HttpService:GetAsync(KEYS_URL .. "?t=" .. tostring(os.time()), true)
-	end)
-	if not ok then return nil, "Server unreachable" end
-	local ok2, data = pcall(HttpService.JSONDecode, HttpService, res)
-	if not ok2 or type(data) ~= "table" then return nil, "Bad format" end
-	return data
-end
-
-local function checkKeyRemote(key)
-	local keys, err = fetchKeys()
-	if not keys then return false, err or "Cannot fetch keys" end
-	local info = keys[key]
-	if not info then return false, "Key not found / revoked" end
-	local exp = tonumber(info.expires) or 0
-	if os.time() > exp then
-		return false, "Key expired"
-	end
-	return true, exp, info.note
-end
-
-local function showKeyGUI()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "QVIZI_KEY"
-	gui.IgnoreGuiInset = true
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 99999
-	gui.Parent = LP:WaitForChild("PlayerGui")
-
-	local bg = Instance.new("Frame", gui)
-	bg.Size = UDim2.new(1, 0, 1, 0)
-	bg.BackgroundColor3 = Color3.fromRGB(10, 5, 16)
-	bg.BorderSizePixel = 0
-
-	local glow = Instance.new("Frame", bg)
-	glow.Size = UDim2.new(1, 0, 1, 0)
-	glow.BackgroundColor3 = THEME.ACCENT
-	glow.BackgroundTransparency = 0.94
-	glow.BorderSizePixel = 0
-
-	local box = Instance.new("Frame", bg)
-	box.Size = UDim2.new(0, 440, 0, 260)
-	box.Position = UDim2.new(0.5, -220, 0.5, -130)
-	box.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
-	box.BorderSizePixel = 0
-	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 16)
-	local stroke = Instance.new("UIStroke", box)
-	stroke.Thickness = 1.5
-	stroke.Color = THEME.ACCENT
-
-	local title = Instance.new("TextLabel", box)
-	title.Size = UDim2.new(1, 0, 0, 36)
-	title.Position = UDim2.new(0, 0, 0, 20)
-	title.BackgroundTransparency = 1
-	title.Text = "QVIZI HUB"
-	title.TextColor3 = THEME.ACCENT
-	title.Font = Enum.Font.GothamBlack
-	title.TextSize = 26
-
-	local subtitle = Instance.new("TextLabel", box)
-	subtitle.Size = UDim2.new(1, 0, 0, 20)
-	subtitle.Position = UDim2.new(0, 0, 0, 52)
-	subtitle.BackgroundTransparency = 1
-	subtitle.Text = "Enter your key to continue"
-	subtitle.TextColor3 = THEME.TEXT_DIM
-	subtitle.Font = Enum.Font.Gotham
-	subtitle.TextSize = 13
-
-	local input = Instance.new("TextBox", box)
-	input.Size = UDim2.new(1, -40, 0, 42)
-	input.Position = UDim2.new(0, 20, 0, 88)
-	input.BackgroundColor3 = Color3.fromRGB(28, 14, 40)
-	input.BorderSizePixel = 0
-	input.PlaceholderText = "QVIZI-XXX-XXXXX"
-	input.PlaceholderColor3 = Color3.fromRGB(160, 130, 185)
-	input.Text = ""
-	input.TextColor3 = Color3.fromRGB(240, 225, 250)
-	input.Font = Enum.Font.Gotham
-	input.TextSize = 14
-	input.ClearTextOnFocus = false
-	Instance.new("UICorner", input).CornerRadius = UDim.new(0, 10)
-	local isp = Instance.new("UIPadding", input)
-	isp.PaddingLeft = UDim.new(0, 12)
-	isp.PaddingRight = UDim.new(0, 12)
-
-	local status = Instance.new("TextLabel", box)
-	status.Size = UDim2.new(1, -40, 0, 20)
-	status.Position = UDim2.new(0, 20, 0, 136)
-	status.BackgroundTransparency = 1
-	status.Text = ""
-	status.TextColor3 = THEME.TEXT_DIM
-	status.Font = Enum.Font.Gotham
-	status.TextSize = 12
-	status.TextXAlignment = Enum.TextXAlignment.Left
-
-	local btn = Instance.new("TextButton", box)
-	btn.Size = UDim2.new(1, -40, 0, 42)
-	btn.Position = UDim2.new(0, 20, 0, 162)
-	btn.BackgroundColor3 = THEME.ACCENT
-	btn.Text = "REDEEM"
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.GothamBlack
-	btn.TextSize = 15
-	btn.BorderSizePixel = 0
-	btn.AutoButtonColor = false
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-
-	local getKeyLbl = Instance.new("TextLabel", box)
-	getKeyLbl.Size = UDim2.new(1, -40, 0, 18)
-	getKeyLbl.Position = UDim2.new(0, 20, 1, -26)
-	getKeyLbl.BackgroundTransparency = 1
-	getKeyLbl.Text = "Get key: t.me/QviziHub"
-	getKeyLbl.TextColor3 = THEME.ACCENT2
-	getKeyLbl.Font = Enum.Font.Gotham
-	getKeyLbl.TextSize = 12
-
-	local statusColor = Color3.fromRGB(160, 130, 185)
-	local checking = false
-	local success = false
-
-	local function setStatus(text, color)
-		status.Text = text
-		status.TextColor3 = color or statusColor
-	end
-
-	btn.MouseButton1Click:Connect(function()
-		if checking then return end
-		local key = input.Text
-		if key == "" then
-			setStatus("Enter a key", THEME.RED)
-			playSound(CLICK_SOUND, 0.4)
-			return
-		end
-
-		checking = true
-		btn.Text = "CHECKING..."
-		btn.BackgroundColor3 = THEME.OFF
-		setStatus("Contacting server...", THEME.TEXT_DIM)
-
-		task.spawn(function()
-			local ok, exp, note = checkKeyRemote(key)
-			if ok then
-				saveKey(key)
-				setStatus("Success! Loading...", THEME.GREEN)
-				btn.Text = "SUCCESS"
-				btn.BackgroundColor3 = THEME.GREEN
-				task.wait(0.9)
-				success = true
-				gui:Destroy()
-			else
-				checking = false
-				btn.Text = "REDEEM"
-				btn.BackgroundColor3 = THEME.ACCENT
-				setStatus("Error: " .. tostring(exp), THEME.RED)
-				playSound(CLICK_SOUND, 0.4)
-			end
-		end)
-	end)
-
-	input.FocusLost:Connect(function(enterPressed)
-		if enterPressed then
-			btn.MouseButton1Click:Fire()
-		end
-	end)
-
-	return function()
-		return success
-	end
-end
-
-local function verifyAccess()
-	local saved = loadSavedKey()
-	if saved and SKIP_IF_SAVED then
-		local ok = checkKeyRemote(saved)
-		if ok then return true end
-	end
-	local waitFn = showKeyGUI()
-	while true do
-		if waitFn() then return true end
-		task.wait(0.1)
-	end
-end
-
-if not verifyAccess() then
-	return
-end
+_G.QVIZI_START_BB_SCAN = nil
+_G.QVIZI_CLEAR_BB = nil
+_G.QVIZI_START_BC_SCAN = nil
+_G.QVIZI_CLEAR_BC = nil
+_G.QVIZI_START_WC_SCAN = nil
+_G.QVIZI_CLEAR_WC = nil
 
 local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
 if introGui then introGui:Destroy() end
@@ -493,7 +277,7 @@ local function playIntro()
 	credit.Size = UDim2.new(1, 0, 0, 30)
 	credit.Position = UDim2.new(0, 0, 0.5, 100)
 	credit.BackgroundTransparency = 1
-	credit.Text = "By: Arbuz0"
+	credit.Text = "By: t.me/QviziHub"
 	credit.TextColor3 = THEME.TEXT
 	credit.Font = Enum.Font.GothamBold
 	credit.TextSize = 20
