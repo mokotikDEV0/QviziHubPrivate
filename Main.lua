@@ -1535,6 +1535,24 @@ local function getOwnerName(inst)
 		return nameAttr
 	end
 
+	local direct = inst:FindFirstChild("PlayerName")
+	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
+		return direct.Value
+	end
+	direct = inst:FindFirstChild("Owner")
+	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
+		return direct.Value
+	end
+
+	for _, d in ipairs(inst:GetChildren()) do
+		if d:IsA("StringValue") and d.Value ~= "" then
+			return d.Value
+		end
+		if d:IsA("ObjectValue") and d.Value then
+			return d.Value.Name
+		end
+	end
+
 	for _, d in ipairs(inst:GetDescendants()) do
 		if d:IsA("StringValue") then
 			local dn = string.lower(d.Name)
@@ -1547,12 +1565,6 @@ local function getOwnerName(inst)
 			if dn == "playername" or dn == "owner" or dn == "player" then
 				if d.Value then return d.Value.Name end
 			end
-		end
-	end
-
-	for _, d in ipairs(inst:GetDescendants()) do
-		if d:IsA("StringValue") and d.Value ~= "" then
-			return d.Value
 		end
 	end
 
@@ -1650,31 +1662,51 @@ local function removeBodyBagESP(inst)
 	end
 end
 
+local scanRunning = false
+local lastScan = 0
+
 local function scanBodyBags()
-	for _, inst in ipairs(workspace:GetDescendants()) do
-		if isBodyBag(inst) then
-			createBodyBagESP(inst)
-		end
-	end
+	if scanRunning then return end
+	local now = tick()
+	if now - lastScan < 1 then return end
+	lastScan = now
+	scanRunning = true
+
+	task.spawn(function()
+		pcall(function()
+			for _, inst in ipairs(workspace:GetDescendants()) do
+				if isBodyBag(inst) then
+					createBodyBagESP(inst)
+				end
+			end
+		end)
+		scanRunning = false
+	end)
 end
 
 scanBodyBags()
 
-workspace.DescendantAdded:Connect(function(inst)
-	if isBodyBag(inst) then
+local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
+	if not isBodyBag(inst) then return end
+	task.defer(function()
 		createBodyBagESP(inst)
-	end
+	end)
 end)
 
-workspace.DescendantRemoving:Connect(function(inst)
+local descRemovedConn = workspace.DescendantRemoving:Connect(function(inst)
 	if bodyBagObjects[inst] then
 		removeBodyBagESP(inst)
 	end
 end)
 
+registerCleanup(function()
+	if descAddedConn then descAddedConn:Disconnect() end
+	if descRemovedConn then descRemovedConn:Disconnect() end
+end)
+
 task.spawn(function()
 	while _G.QVIZI_LOADED do
-		task.wait(0.5)
+		task.wait(3)
 		scanBodyBags()
 	end
 end)
@@ -1838,10 +1870,18 @@ local renderConn = RunService.RenderStepped:Connect(function()
 			continue
 		end
 
+		if not Config.BodyBagESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
 		local pos = getBodyBagPosition(inst)
 		local adornee = getBodyBagAdornee(inst)
 
-		if Config.BodyBagESP and pos and adornee then
+		if pos and adornee then
 			local distance = (Camera.CFrame.Position - pos).Magnitude
 			if distance <= Config.BodyBagMaxDist then
 				objs.bb.Adornee = adornee
@@ -1849,7 +1889,7 @@ local renderConn = RunService.RenderStepped:Connect(function()
 
 				if Config.BodyBagOwner then
 					local now = tick()
-					if now - objs.lastOwnerCheck > 2 or not objs.cachedOwner then
+					if now - objs.lastOwnerCheck > 5 or not objs.cachedOwner then
 						objs.cachedOwner = getOwnerName(inst)
 						objs.lastOwnerCheck = now
 					end
