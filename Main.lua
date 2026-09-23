@@ -1939,8 +1939,6 @@ end
 
 local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim", "BaseClaimColor")
 local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate", "WoodenCrateColor")
-local createSulfurOreESP, removeSulfurOreESP = makeDeployableESP({}, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
-local createMetalOreESP, removeMetalOreESP = makeDeployableESP({}, "MetalOre", "Metal Ore", "MetalOreColor")
 
 local sulfurOreObjects = {}
 local metalOreObjects = {}
@@ -1950,19 +1948,46 @@ local wcScanState = { running = false }
 local soScanState = { running = false }
 local moScanState = { running = false }
 
-local function isSulfurOre(part)
-	if not part or not part:IsA("BasePart") then return false end
-	return part.Name == "Sulfur Ore"
+-- ==== ИСПРАВЛЕНО: принимаем и Model, и BasePart ====
+local function isSulfurOre(inst)
+	if not inst then return false end
+	if inst:IsA("Model") then
+		return inst.Name == "Sulfur Ore"
+	end
+	if inst:IsA("BasePart") then
+		return inst.Name == "Sulfur Ore"
+	end
+	return false
 end
 
-local function isMetalOre(part)
-	if not part or not part:IsA("BasePart") then return false end
-	return part.Name == "Metal Ore"
+local function isMetalOre(inst)
+	if not inst then return false end
+	if inst:IsA("Model") then
+		return inst.Name == "Metal Ore"
+	end
+	if inst:IsA("BasePart") then
+		return inst.Name == "Metal Ore"
+	end
+	return false
 end
 
-local function makeOreESP(part, objectsTable, name, labelText, colorKey)
-	if objectsTable[part] then return end
-	if not part:IsA("BasePart") then return end
+local function getOreAdornee(inst)
+	if inst:IsA("BasePart") then return inst end
+	if inst:IsA("Model") then
+		if inst.PrimaryPart then return inst.PrimaryPart end
+		local union = inst:FindFirstChild("Union")
+		if union and union:IsA("BasePart") then return union end
+		local top = inst:FindFirstChild("Top")
+		if top and top:IsA("BasePart") then return top end
+		return inst:FindFirstChildWhichIsA("BasePart")
+	end
+	return nil
+end
+
+local function makeOreESP(inst, objectsTable, name, labelText, colorKey)
+	if objectsTable[inst] then return end
+	local adornee = getOreAdornee(inst)
+	if not adornee then return end
 
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "QVIZI_" .. name
@@ -2003,23 +2028,24 @@ local function makeOreESP(part, objectsTable, name, labelText, colorKey)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = part
+	highlight.Adornee = inst
 	highlight.Enabled = false
 	highlight.Parent = LP:WaitForChild("PlayerGui")
 
-	objectsTable[part] = {
+	objectsTable[inst] = {
 		bb = bb,
 		nameLbl = nameLbl,
 		distLbl = distLbl,
 		highlight = highlight,
+		adornee = adornee,
 	}
 end
 
-local function removeOreESP(part, objectsTable)
-	if objectsTable[part] then
-		pcall(function() objectsTable[part].bb:Destroy() end)
-		pcall(function() objectsTable[part].highlight:Destroy() end)
-		objectsTable[part] = nil
+local function removeOreESP(inst, objectsTable)
+	if objectsTable[inst] then
+		pcall(function() objectsTable[inst].bb:Destroy() end)
+		pcall(function() objectsTable[inst].highlight:Destroy() end)
+		objectsTable[inst] = nil
 	end
 end
 
@@ -2029,12 +2055,12 @@ local function scanOres()
 
 	for _, spawn in ipairs(root:GetChildren()) do
 		if spawn.Name == "OreSpawn" then
-			for _, part in ipairs(spawn:GetChildren()) do
-				if Config.SulfurOreESP and isSulfurOre(part) then
-					makeOreESP(part, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+			for _, child in ipairs(spawn:GetChildren()) do
+				if Config.SulfurOreESP and isSulfurOre(child) then
+					makeOreESP(child, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
 				end
-				if Config.MetalOreESP and isMetalOre(part) then
-					makeOreESP(part, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
+				if Config.MetalOreESP and isMetalOre(child) then
+					makeOreESP(child, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
 				end
 			end
 		end
@@ -2076,7 +2102,7 @@ end
 local oreRoot = workspace:FindFirstChild("OreSpawns")
 if oreRoot then
 	oreRoot.DescendantAdded:Connect(function(inst)
-		if not inst:IsA("BasePart") then return end
+		-- ==== ИСПРАВЛЕНО: без проверки IsA("BasePart") ====
 		if Config.SulfurOreESP and isSulfurOre(inst) then
 			makeOreESP(inst, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
 		end
@@ -2540,9 +2566,10 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 
-	for part, objs in pairs(sulfurOreObjects) do
-		if not part.Parent then
-			removeOreESP(part, sulfurOreObjects)
+	-- ==== ИСПРАВЛЕНО: руды используют objs.adornee ====
+	for inst, objs in pairs(sulfurOreObjects) do
+		if not inst.Parent then
+			removeOreESP(inst, sulfurOreObjects)
 			continue
 		end
 
@@ -2554,9 +2581,10 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 			continue
 		end
 
-		local distance = (Camera.CFrame.Position - part.Position).Magnitude
+		local pos = objs.adornee.Position
+		local distance = (Camera.CFrame.Position - pos).Magnitude
 		if distance <= Config.SulfurOreMaxDist then
-			objs.bb.Adornee = part
+			objs.bb.Adornee = objs.adornee
 			objs.bb.Enabled = true
 
 			local col = Config.SulfurOreUseCustom and Config.SulfurOreColor or Config.ESPColor
@@ -2570,7 +2598,7 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 				objs.distLbl.Visible = false
 			end
 
-			objs.highlight.Adornee = part
+			objs.highlight.Adornee = inst
 			objs.highlight.Enabled = true
 			objs.highlight.FillColor = col
 			objs.highlight.OutlineColor = col
@@ -2580,9 +2608,9 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 
-	for part, objs in pairs(metalOreObjects) do
-		if not part.Parent then
-			removeOreESP(part, metalOreObjects)
+	for inst, objs in pairs(metalOreObjects) do
+		if not inst.Parent then
+			removeOreESP(inst, metalOreObjects)
 			continue
 		end
 
@@ -2594,9 +2622,10 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 			continue
 		end
 
-		local distance = (Camera.CFrame.Position - part.Position).Magnitude
+		local pos = objs.adornee.Position
+		local distance = (Camera.CFrame.Position - pos).Magnitude
 		if distance <= Config.MetalOreMaxDist then
-			objs.bb.Adornee = part
+			objs.bb.Adornee = objs.adornee
 			objs.bb.Enabled = true
 
 			local col = Config.MetalOreUseCustom and Config.MetalOreColor or Config.ESPColor
@@ -2610,7 +2639,7 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 				objs.distLbl.Visible = false
 			end
 
-			objs.highlight.Adornee = part
+			objs.highlight.Adornee = inst
 			objs.highlight.Enabled = true
 			objs.highlight.FillColor = col
 			objs.highlight.OutlineColor = col
