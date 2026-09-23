@@ -22,7 +22,7 @@ if _G.QVIZI_LOADED then
 end
 _G.QVIZI_LOADED = true
 
-local VERSION = "V1.4"
+local VERSION = "V1.5"
 
 local THEME = {
 	BG = Color3.fromRGB(10, 5, 16),
@@ -79,6 +79,16 @@ local Config = {
 	WoodenCrateMaxDist = 5000,
 	WoodenCrateColor = Color3.fromRGB(200, 150, 90),
 	WoodenCrateUseCustom = false,
+	SulfurOreESP = false,
+	SulfurOreDistance = true,
+	SulfurOreMaxDist = 5000,
+	SulfurOreColor = Color3.fromRGB(255, 230, 60),
+	SulfurOreUseCustom = false,
+	MetalOreESP = false,
+	MetalOreDistance = true,
+	MetalOreMaxDist = 5000,
+	MetalOreColor = Color3.fromRGB(180, 180, 200),
+	MetalOreUseCustom = false,
 }
 
 local DEFAULT_SPEED = 16
@@ -120,6 +130,8 @@ local COLOR_KEYS = {
 	BodyBagColor = true,
 	BaseClaimColor = true,
 	WoodenCrateColor = true,
+	SulfurOreColor = true,
+	MetalOreColor = true,
 }
 
 local function loadCfg()
@@ -199,6 +211,10 @@ _G.QVIZI_START_BC_SCAN = nil
 _G.QVIZI_CLEAR_BC = nil
 _G.QVIZI_START_WC_SCAN = nil
 _G.QVIZI_CLEAR_WC = nil
+_G.QVIZI_START_SO_SCAN = nil
+_G.QVIZI_CLEAR_SO = nil
+_G.QVIZI_START_MO_SCAN = nil
+_G.QVIZI_CLEAR_MO = nil
 
 local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
 if introGui then introGui:Destroy() end
@@ -971,116 +987,109 @@ local function createMenu()
 
 	local farmPage = pages["Farm"]
 
-	local bbSectionLbl = Instance.new("TextLabel", farmPage)
-	bbSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	bbSectionLbl.Position = UDim2.new(0, 0, 0, 0)
-	bbSectionLbl.BackgroundTransparency = 1
-	bbSectionLbl.Text = "Body Bags"
-	bbSectionLbl.TextColor3 = THEME.TEXT
-	bbSectionLbl.Font = Enum.Font.GothamBold
-	bbSectionLbl.TextSize = 14
-	bbSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+	local function makeSection(label, y)
+		local s = Instance.new("TextLabel", farmPage)
+		s.Size = UDim2.new(1, -10, 0, 22)
+		s.Position = UDim2.new(0, 0, 0, y)
+		s.BackgroundTransparency = 1
+		s.Text = label
+		s.TextColor3 = THEME.TEXT
+		s.Font = Enum.Font.GothamBold
+		s.TextSize = 14
+		s.TextXAlignment = Enum.TextXAlignment.Left
+		return s
+	end
 
-	local bbToggleRow = makeToggle(farmPage, "Enable BodyBag ESP", 30, "BodyBagESP")
-	task.spawn(function()
-		local bbBtn = nil
-		for _, c in ipairs(bbToggleRow:GetDescendants()) do
-			if c:IsA("TextButton") then
-				bbBtn = c
-				break
-			end
-		end
-		if bbBtn then
-			bbBtn.MouseButton1Click:Connect(function()
-				task.wait(0.05)
-				if Config.BodyBagESP then
-					if _G.QVIZI_START_BB_SCAN then _G.QVIZI_START_BB_SCAN() end
-				else
-					if _G.QVIZI_CLEAR_BB then _G.QVIZI_CLEAR_BB() end
+	local function bindToggleAction(row, action)
+		task.spawn(function()
+			local btn = nil
+			for _, c in ipairs(row:GetDescendants()) do
+				if c:IsA("TextButton") then
+					btn = c
+					break
 				end
-			end)
+			end
+			if btn then
+				btn.MouseButton1Click:Connect(function()
+					task.wait(0.05)
+					action()
+				end)
+			end
+		end)
+	end
+
+	makeSection("Body Bags", 0)
+	local bbToggleRow = makeToggle(farmPage, "Enable BodyBag ESP", 30, "BodyBagESP")
+	bindToggleAction(bbToggleRow, function()
+		if Config.BodyBagESP then
+			if _G.QVIZI_START_BB_SCAN then _G.QVIZI_START_BB_SCAN() end
+		else
+			if _G.QVIZI_CLEAR_BB then _G.QVIZI_CLEAR_BB() end
 		end
 	end)
 	makeToggle(farmPage, "Show Owner", 74, "BodyBagOwner")
 	makeToggle(farmPage, "Show Distance", 118, "BodyBagDistance")
 	makeToggle(farmPage, "Use Custom Color", 162, "BodyBagUseCustom")
 	makeSlider(farmPage, "Max Distance", 212, 1, 10000, "BodyBagMaxDist", "m")
-
 	local bbColorBox = makeColorPicker(farmPage, 276, "BodyBagColor", "BodyBag Color")
 
-	local bcSectionLbl = Instance.new("TextLabel", farmPage)
-	bcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	bcSectionLbl.Position = UDim2.new(0, 0, 0, 374)
-	bcSectionLbl.BackgroundTransparency = 1
-	bcSectionLbl.Text = "Base Claim"
-	bcSectionLbl.TextColor3 = THEME.TEXT
-	bcSectionLbl.Font = Enum.Font.GothamBold
-	bcSectionLbl.TextSize = 14
-	bcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
-
+	makeSection("Base Claim", 374)
 	local bcToggleRow = makeToggle(farmPage, "Enable Base Claim ESP", 404, "BaseClaimESP")
-	task.spawn(function()
-		local bcBtn = nil
-		for _, c in ipairs(bcToggleRow:GetDescendants()) do
-			if c:IsA("TextButton") then
-				bcBtn = c
-				break
-			end
-		end
-		if bcBtn then
-			bcBtn.MouseButton1Click:Connect(function()
-				task.wait(0.05)
-				if Config.BaseClaimESP then
-					if _G.QVIZI_START_BC_SCAN then _G.QVIZI_START_BC_SCAN() end
-				else
-					if _G.QVIZI_CLEAR_BC then _G.QVIZI_CLEAR_BC() end
-				end
-			end)
+	bindToggleAction(bcToggleRow, function()
+		if Config.BaseClaimESP then
+			if _G.QVIZI_START_BC_SCAN then _G.QVIZI_START_BC_SCAN() end
+		else
+			if _G.QVIZI_CLEAR_BC then _G.QVIZI_CLEAR_BC() end
 		end
 	end)
 	makeToggle(farmPage, "Show Distance", 448, "BaseClaimDistance")
 	makeToggle(farmPage, "Use Custom Color", 492, "BaseClaimUseCustom")
 	makeSlider(farmPage, "Max Distance", 542, 1, 10000, "BaseClaimMaxDist", "m")
-
 	local bcColorBox = makeColorPicker(farmPage, 606, "BaseClaimColor", "Base Claim Color")
 
-	local wcSectionLbl = Instance.new("TextLabel", farmPage)
-	wcSectionLbl.Size = UDim2.new(1, -10, 0, 22)
-	wcSectionLbl.Position = UDim2.new(0, 0, 0, 704)
-	wcSectionLbl.BackgroundTransparency = 1
-	wcSectionLbl.Text = "Wooden Crate"
-	wcSectionLbl.TextColor3 = THEME.TEXT
-	wcSectionLbl.Font = Enum.Font.GothamBold
-	wcSectionLbl.TextSize = 14
-	wcSectionLbl.TextXAlignment = Enum.TextXAlignment.Left
-
+	makeSection("Wooden Crate", 704)
 	local wcToggleRow = makeToggle(farmPage, "Enable Wooden Crate ESP", 734, "WoodenCrateESP")
-	task.spawn(function()
-		local wcBtn = nil
-		for _, c in ipairs(wcToggleRow:GetDescendants()) do
-			if c:IsA("TextButton") then
-				wcBtn = c
-				break
-			end
-		end
-		if wcBtn then
-			wcBtn.MouseButton1Click:Connect(function()
-				task.wait(0.05)
-				if Config.WoodenCrateESP then
-					if _G.QVIZI_START_WC_SCAN then _G.QVIZI_START_WC_SCAN() end
-				else
-					if _G.QVIZI_CLEAR_WC then _G.QVIZI_CLEAR_WC() end
-				end
-			end)
+	bindToggleAction(wcToggleRow, function()
+		if Config.WoodenCrateESP then
+			if _G.QVIZI_START_WC_SCAN then _G.QVIZI_START_WC_SCAN() end
+		else
+			if _G.QVIZI_CLEAR_WC then _G.QVIZI_CLEAR_WC() end
 		end
 	end)
 	makeToggle(farmPage, "Show Distance", 778, "WoodenCrateDistance")
 	makeToggle(farmPage, "Use Custom Color", 822, "WoodenCrateUseCustom")
 	makeSlider(farmPage, "Max Distance", 872, 1, 10000, "WoodenCrateMaxDist", "m")
-
 	local wcColorBox = makeColorPicker(farmPage, 936, "WoodenCrateColor", "Wooden Crate Color")
 
-	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1040)
+	makeSection("Sulfur Ore", 1034)
+	local soToggleRow = makeToggle(farmPage, "Enable Sulfur Ore ESP", 1064, "SulfurOreESP")
+	bindToggleAction(soToggleRow, function()
+		if Config.SulfurOreESP then
+			if _G.QVIZI_START_SO_SCAN then _G.QVIZI_START_SO_SCAN() end
+		else
+			if _G.QVIZI_CLEAR_SO then _G.QVIZI_CLEAR_SO() end
+		end
+	end)
+	makeToggle(farmPage, "Show Distance", 1108, "SulfurOreDistance")
+	makeToggle(farmPage, "Use Custom Color", 1152, "SulfurOreUseCustom")
+	makeSlider(farmPage, "Max Distance", 1202, 1, 10000, "SulfurOreMaxDist", "m")
+	local soColorBox = makeColorPicker(farmPage, 1266, "SulfurOreColor", "Sulfur Ore Color")
+
+	makeSection("Metal Ore", 1364)
+	local moToggleRow = makeToggle(farmPage, "Enable Metal Ore ESP", 1394, "MetalOreESP")
+	bindToggleAction(moToggleRow, function()
+		if Config.MetalOreESP then
+			if _G.QVIZI_START_MO_SCAN then _G.QVIZI_START_MO_SCAN() end
+		else
+			if _G.QVIZI_CLEAR_MO then _G.QVIZI_CLEAR_MO() end
+		end
+	end)
+	makeToggle(farmPage, "Show Distance", 1438, "MetalOreDistance")
+	makeToggle(farmPage, "Use Custom Color", 1482, "MetalOreUseCustom")
+	makeSlider(farmPage, "Max Distance", 1532, 1, 10000, "MetalOreMaxDist", "m")
+	local moColorBox = makeColorPicker(farmPage, 1596, "MetalOreColor", "Metal Ore Color")
+
+	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1700)
 
 	local setPage = pages["Settings"]
 	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
@@ -1113,7 +1122,7 @@ local function createMenu()
 		elseif mode == "Night" then
 			Lighting.ClockTime = 0
 			Lighting.Brightness = 1.5
-			Lighting.Ambient = Color3.fromRGB(90, 90, 100)
+			Lighting.Ambient = Color3.fromRGB(90, 90, 90)
 			Lighting.OutdoorAmbient = Color3.fromRGB(100, 100, 120)
 			Lighting.FogEnd = 100000
 		elseif mode == "Fog" then
@@ -1207,6 +1216,16 @@ local function createMenu()
 		Config.WoodenCrateMaxDist = 5000
 		Config.WoodenCrateColor = Color3.fromRGB(200, 150, 90)
 		Config.WoodenCrateUseCustom = false
+		Config.SulfurOreESP = false
+		Config.SulfurOreDistance = true
+		Config.SulfurOreMaxDist = 5000
+		Config.SulfurOreColor = Color3.fromRGB(255, 230, 60)
+		Config.SulfurOreUseCustom = false
+		Config.MetalOreESP = false
+		Config.MetalOreDistance = true
+		Config.MetalOreMaxDist = 5000
+		Config.MetalOreColor = Color3.fromRGB(180, 180, 200)
+		Config.MetalOreUseCustom = false
 		saveCfg()
 	end)
 
@@ -1920,9 +1939,160 @@ end
 
 local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim", "BaseClaimColor")
 local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate", "WoodenCrateColor")
+local createSulfurOreESP, removeSulfurOreESP = makeDeployableESP({}, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+local createMetalOreESP, removeMetalOreESP = makeDeployableESP({}, "MetalOre", "Metal Ore", "MetalOreColor")
+
+local sulfurOreObjects = {}
+local metalOreObjects = {}
 
 local bcScanState = { running = false }
 local wcScanState = { running = false }
+local soScanState = { running = false }
+local moScanState = { running = false }
+
+local function isSulfurOre(part)
+	if not part or not part:IsA("BasePart") then return false end
+	return part.Name == "Sulfur Ore"
+end
+
+local function isMetalOre(part)
+	if not part or not part:IsA("BasePart") then return false end
+	return part.Name == "Metal Ore"
+end
+
+local function makeOreESP(part, objectsTable, name, labelText, colorKey)
+	if objectsTable[part] then return end
+	if not part:IsA("BasePart") then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_" .. name
+	bb.Size = UDim2.new(0, 200, 0, 40)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local nameLbl = Instance.new("TextLabel", bb)
+	nameLbl.Size = UDim2.new(1, 0, 0, 22)
+	nameLbl.Position = UDim2.new(0, 0, 0, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = labelText
+	nameLbl.TextColor3 = Config[colorKey]
+	nameLbl.Font = Enum.Font.GothamBold
+	nameLbl.TextSize = 15
+	nameLbl.TextStrokeTransparency = 0
+	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 18)
+	distLbl.Position = UDim2.new(0, 0, 0, 24)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Config[colorKey]
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 14
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_" .. name .. "HL"
+	highlight.FillColor = Config[colorKey]
+	highlight.OutlineColor = Config[colorKey]
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = part
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	objectsTable[part] = {
+		bb = bb,
+		nameLbl = nameLbl,
+		distLbl = distLbl,
+		highlight = highlight,
+	}
+end
+
+local function removeOreESP(part, objectsTable)
+	if objectsTable[part] then
+		pcall(function() objectsTable[part].bb:Destroy() end)
+		pcall(function() objectsTable[part].highlight:Destroy() end)
+		objectsTable[part] = nil
+	end
+end
+
+local function scanOres()
+	local root = workspace:FindFirstChild("OreSpawns")
+	if not root then return end
+
+	for _, spawn in ipairs(root:GetChildren()) do
+		if spawn.Name == "OreSpawn" then
+			for _, part in ipairs(spawn:GetChildren()) do
+				if Config.SulfurOreESP and isSulfurOre(part) then
+					makeOreESP(part, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+				end
+				if Config.MetalOreESP and isMetalOre(part) then
+					makeOreESP(part, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
+				end
+			end
+		end
+	end
+end
+
+_G.QVIZI_START_SO_SCAN = function()
+	if not Config.SulfurOreESP then return end
+	if soScanState.running then return end
+	soScanState.running = true
+	task.spawn(function()
+		pcall(scanOres)
+		soScanState.running = false
+	end)
+end
+
+_G.QVIZI_CLEAR_SO = function()
+	for part, _ in pairs(sulfurOreObjects) do
+		removeOreESP(part, sulfurOreObjects)
+	end
+end
+
+_G.QVIZI_START_MO_SCAN = function()
+	if not Config.MetalOreESP then return end
+	if moScanState.running then return end
+	moScanState.running = true
+	task.spawn(function()
+		pcall(scanOres)
+		moScanState.running = false
+	end)
+end
+
+_G.QVIZI_CLEAR_MO = function()
+	for part, _ in pairs(metalOreObjects) do
+		removeOreESP(part, metalOreObjects)
+	end
+end
+
+local oreRoot = workspace:FindFirstChild("OreSpawns")
+if oreRoot then
+	oreRoot.DescendantAdded:Connect(function(inst)
+		if not inst:IsA("BasePart") then return end
+		if Config.SulfurOreESP and isSulfurOre(inst) then
+			makeOreESP(inst, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+		end
+		if Config.MetalOreESP and isMetalOre(inst) then
+			makeOreESP(inst, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
+		end
+	end)
+	oreRoot.DescendantRemoving:Connect(function(inst)
+		if sulfurOreObjects[inst] then
+			removeOreESP(inst, sulfurOreObjects)
+		end
+		if metalOreObjects[inst] then
+			removeOreESP(inst, metalOreObjects)
+		end
+	end)
+end
 
 local function scanDeployables(tbl, isTargetFn, createFn, state)
 	if not Config[tbl.enabledKey] then return end
@@ -1999,6 +2169,12 @@ registerCleanup(function()
 	end
 	for inst, _ in pairs(bodyBagObjects) do
 		removeBodyBagESP(inst)
+	end
+	for part, _ in pairs(sulfurOreObjects) do
+		removeOreESP(part, sulfurOreObjects)
+	end
+	for part, _ in pairs(metalOreObjects) do
+		removeOreESP(part, metalOreObjects)
 	end
 end)
 
@@ -2123,7 +2299,18 @@ registerCleanup(function()
 	end)
 end)
 
-local renderConn = RunService.RenderStepped:Connect(function()
+local oreCheckAccum = 0
+local oreCheckInterval = 1.5
+
+local renderConn = RunService.RenderStepped:Connect(function(dt)
+	oreCheckAccum = oreCheckAccum + dt
+	if oreCheckAccum >= oreCheckInterval then
+		oreCheckAccum = 0
+		if Config.SulfurOreESP or Config.MetalOreESP then
+			task.spawn(scanOres)
+		end
+	end
+
 	for plr, objs in pairs(espObjects) do
 		local char = plr.Character
 		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
@@ -2353,6 +2540,86 @@ local renderConn = RunService.RenderStepped:Connect(function()
 		end
 	end
 
+	for part, objs in pairs(sulfurOreObjects) do
+		if not part.Parent then
+			removeOreESP(part, sulfurOreObjects)
+			continue
+		end
+
+		if not Config.SulfurOreESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
+		local distance = (Camera.CFrame.Position - part.Position).Magnitude
+		if distance <= Config.SulfurOreMaxDist then
+			objs.bb.Adornee = part
+			objs.bb.Enabled = true
+
+			local col = Config.SulfurOreUseCustom and Config.SulfurOreColor or Config.ESPColor
+			objs.nameLbl.TextColor3 = col
+
+			if Config.SulfurOreDistance then
+				objs.distLbl.Visible = true
+				objs.distLbl.TextColor3 = col
+				objs.distLbl.Text = string.format("%dm", math.floor(distance))
+			else
+				objs.distLbl.Visible = false
+			end
+
+			objs.highlight.Adornee = part
+			objs.highlight.Enabled = true
+			objs.highlight.FillColor = col
+			objs.highlight.OutlineColor = col
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
+	for part, objs in pairs(metalOreObjects) do
+		if not part.Parent then
+			removeOreESP(part, metalOreObjects)
+			continue
+		end
+
+		if not Config.MetalOreESP then
+			if objs.bb.Enabled then
+				objs.bb.Enabled = false
+				objs.highlight.Enabled = false
+			end
+			continue
+		end
+
+		local distance = (Camera.CFrame.Position - part.Position).Magnitude
+		if distance <= Config.MetalOreMaxDist then
+			objs.bb.Adornee = part
+			objs.bb.Enabled = true
+
+			local col = Config.MetalOreUseCustom and Config.MetalOreColor or Config.ESPColor
+			objs.nameLbl.TextColor3 = col
+
+			if Config.MetalOreDistance then
+				objs.distLbl.Visible = true
+				objs.distLbl.TextColor3 = col
+				objs.distLbl.Text = string.format("%dm", math.floor(distance))
+			else
+				objs.distLbl.Visible = false
+			end
+
+			objs.highlight.Adornee = part
+			objs.highlight.Enabled = true
+			objs.highlight.FillColor = col
+			objs.highlight.OutlineColor = col
+		else
+			objs.bb.Enabled = false
+			objs.highlight.Enabled = false
+		end
+	end
+
 	if fovCircle then
 		if Config.Aimbot and Config.AimDrawFOV then
 			fovCircle.Visible = true
@@ -2438,5 +2705,11 @@ task.spawn(function()
 	end
 	if Config.WoodenCrateESP and _G.QVIZI_START_WC_SCAN then
 		_G.QVIZI_START_WC_SCAN()
+	end
+	if Config.SulfurOreESP and _G.QVIZI_START_SO_SCAN then
+		_G.QVIZI_START_SO_SCAN()
+	end
+	if Config.MetalOreESP and _G.QVIZI_START_MO_SCAN then
+		_G.QVIZI_START_MO_SCAN()
 	end
 end)
