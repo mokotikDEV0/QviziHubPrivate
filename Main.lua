@@ -39,6 +39,7 @@ local THEME = {
 }
 
 local CLICK_SOUND = "rbxassetid://139719503904449"
+local INTRO_SOUND = "rbxassetid://6350854289"
 
 local Config = {
 	ESP = false,
@@ -61,7 +62,7 @@ local Config = {
 	SpeedEnabled = false,
 	SpeedValue = 50,
 	InfJump = false,
-	IntroEnabled = false,
+	IntroEnabled = true,
 	BodyBagESP = false,
 	BodyBagOwner = true,
 	BodyBagDistance = true,
@@ -92,6 +93,33 @@ local Config = {
 
 local DEFAULT_SPEED = 16
 local CFG_FILE = "qvizi_cfg.json"
+
+local originalLighting = nil
+
+local function saveLighting()
+	originalLighting = {
+		ClockTime = Lighting.ClockTime,
+		Brightness = Lighting.Brightness,
+		FogEnd = Lighting.FogEnd,
+		FogStart = Lighting.FogStart,
+		FogColor = Lighting.FogColor,
+		Ambient = Lighting.Ambient,
+		OutdoorAmbient = Lighting.OutdoorAmbient,
+	}
+end
+
+local function restoreLighting()
+	if not originalLighting then return end
+	pcall(function()
+		Lighting.ClockTime = originalLighting.ClockTime
+		Lighting.Brightness = originalLighting.Brightness
+		Lighting.FogEnd = originalLighting.FogEnd
+		Lighting.FogStart = originalLighting.FogStart
+		Lighting.FogColor = originalLighting.FogColor
+		Lighting.Ambient = originalLighting.Ambient
+		Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+	end)
+end
 
 local function hasFs()
 	return type(writefile) == "function" and type(isfile) == "function" and type(readfile) == "function"
@@ -170,6 +198,7 @@ _G.QVIZI_CLEANUP = function()
 	for _, fn in ipairs(cleanupFns) do
 		pcall(fn)
 	end
+	restoreLighting()
 end
 
 local function registerCleanup(fn)
@@ -187,18 +216,148 @@ _G.QVIZI_CLEAR_SO = nil
 _G.QVIZI_START_MO_SCAN = nil
 _G.QVIZI_CLEAR_MO = nil
 
-local espObjects = {}
-local bodyBagObjects = {}
-local baseClaimObjects = {}
-local woodenCrateObjects = {}
-local sulfurOreObjects = {}
-local metalOreObjects = {}
+local introGui = LP.PlayerGui:FindFirstChild("QVIZIIntro")
+if introGui then introGui:Destroy() end
 
-local bcScanState = { running = false }
-local wcScanState = { running = false }
-local soScanState = { running = false }
-local moScanState = { running = false }
-local bbScanState = { running = false }
+local introPlayed = false
+local function playIntro()
+	if introPlayed then return end
+	introPlayed = true
+
+	local introSound = Instance.new("Sound")
+	introSound.SoundId = INTRO_SOUND
+	introSound.Volume = 0.35
+	introSound.Parent = SoundService
+	introSound:Play()
+	registerCleanup(function()
+		pcall(function() introSound:Destroy() end)
+	end)
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "QVIZIIntro"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 999
+	gui.Parent = LP:WaitForChild("PlayerGui")
+
+	local bg = Instance.new("Frame", gui)
+	bg.Size = UDim2.new(1, 0, 1, 0)
+	bg.BackgroundColor3 = Color3.new(0, 0, 0)
+	bg.BorderSizePixel = 0
+
+	local glow = Instance.new("Frame", bg)
+	glow.Size = UDim2.new(1, 0, 1, 0)
+	glow.BackgroundColor3 = THEME.ACCENT
+	glow.BackgroundTransparency = 0.9
+	glow.BorderSizePixel = 0
+
+	local glitchContainer = Instance.new("Frame", bg)
+	glitchContainer.Size = UDim2.new(1, 0, 0, 200)
+	glitchContainer.Position = UDim2.new(0, 0, 0.5, -100)
+	glitchContainer.BackgroundTransparency = 1
+
+	local mainTitle = Instance.new("TextLabel", glitchContainer)
+	mainTitle.Size = UDim2.new(1, 0, 0, 130)
+	mainTitle.BackgroundTransparency = 1
+	mainTitle.Text = "QVIZI HUB"
+	mainTitle.TextColor3 = THEME.ACCENT
+	mainTitle.Font = Enum.Font.GothamBlack
+	mainTitle.TextScaled = true
+	mainTitle.TextTransparency = 1
+	mainTitle.TextStrokeTransparency = 1
+	mainTitle.TextStrokeColor3 = THEME.ACCENT2
+
+	local ghostR = mainTitle:Clone()
+	ghostR.TextColor3 = Color3.fromRGB(255, 40, 100)
+	ghostR.Position = UDim2.new(0, 8, 0, 0)
+	ghostR.Parent = glitchContainer
+	ghostR.ZIndex = mainTitle.ZIndex - 1
+
+	local ghostB = mainTitle:Clone()
+	ghostB.TextColor3 = Color3.fromRGB(40, 220, 255)
+	ghostB.Position = UDim2.new(0, -8, 0, 0)
+	ghostB.Parent = glitchContainer
+	ghostB.ZIndex = mainTitle.ZIndex - 2
+
+	local subTitle = Instance.new("TextLabel", bg)
+	subTitle.Size = UDim2.new(1, 0, 0, 36)
+	subTitle.Position = UDim2.new(0, 0, 0.5, 50)
+	subTitle.BackgroundTransparency = 1
+	subTitle.Text = "P R I V A T E   + + +   " .. VERSION
+	subTitle.TextColor3 = THEME.ACCENT2
+	subTitle.Font = Enum.Font.GothamBold
+	subTitle.TextSize = 22
+	subTitle.TextTransparency = 1
+
+	local credit = Instance.new("TextLabel", bg)
+	credit.Size = UDim2.new(1, 0, 0, 30)
+	credit.Position = UDim2.new(0, 0, 0.5, 100)
+	credit.BackgroundTransparency = 1
+	credit.Text = "By: t.me/QviziHub"
+	credit.TextColor3 = THEME.TEXT
+	credit.Font = Enum.Font.GothamBold
+	credit.TextSize = 20
+	credit.TextTransparency = 1
+
+	local loadingBar = Instance.new("Frame", bg)
+	loadingBar.Size = UDim2.new(0, 400, 0, 4)
+	loadingBar.Position = UDim2.new(0.5, -200, 0.5, 150)
+	loadingBar.BackgroundColor3 = THEME.ROW
+	loadingBar.BorderSizePixel = 0
+	Instance.new("UICorner", loadingBar).CornerRadius = UDim.new(1, 0)
+
+	local loadingFill = Instance.new("Frame", loadingBar)
+	loadingFill.Size = UDim2.new(0, 0, 1, 0)
+	loadingFill.BackgroundColor3 = THEME.ACCENT
+	loadingFill.BorderSizePixel = 0
+	Instance.new("UICorner", loadingFill).CornerRadius = UDim.new(1, 0)
+	local lfg = Instance.new("UIGradient", loadingFill)
+	lfg.Color = ColorSequence.new(THEME.ACCENT, THEME.ACCENT2)
+
+	local loadingLbl = Instance.new("TextLabel", bg)
+	loadingLbl.Size = UDim2.new(0, 400, 0, 20)
+	loadingLbl.Position = UDim2.new(0.5, -200, 0.5, 158)
+	loadingLbl.BackgroundTransparency = 1
+	loadingLbl.Text = "initializing..."
+	loadingLbl.TextColor3 = THEME.TEXT_DIM
+	loadingLbl.Font = Enum.Font.Code
+	loadingLbl.TextSize = 12
+	loadingLbl.TextTransparency = 1
+
+	TweenService:Create(mainTitle, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+	TweenService:Create(ghostR, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+	TweenService:Create(ghostB, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+
+	task.wait(0.9)
+	TweenService:Create(subTitle, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+	TweenService:Create(credit, TweenInfo.new(0.6), {TextTransparency = 0}):Play()
+	TweenService:Create(loadingLbl, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+	local stages = {
+		"loading modules...",
+		"hooking render...",
+		"initializing ESP...",
+		"loading config...",
+		"connecting...",
+		"ready."
+	}
+	for i, stageText in ipairs(stages) do
+		loadingLbl.Text = stageText
+		TweenService:Create(loadingFill, TweenInfo.new(0.25), {Size = UDim2.new(i / #stages, 0, 1, 0)}):Play()
+		task.wait(0.25)
+	end
+
+	task.wait(0.4)
+	for _, obj in pairs({mainTitle, ghostR, ghostB, subTitle, credit, loadingLbl}) do
+		TweenService:Create(obj, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+	end
+	TweenService:Create(loadingBar, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(loadingFill, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(bg, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(glow, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+	task.wait(0.45)
+	gui:Destroy()
+end
 
 local fovGui, fovCircle, fovStroke
 
@@ -249,717 +408,89 @@ end
 
 startRainbow()
 
-local function getModelPosition(inst)
-	local primary = inst.PrimaryPart
-	if primary then return primary.Position end
-	local hrp = inst:FindFirstChild("HumanoidRootPart")
-	if hrp then return hrp.Position end
-	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
-	if torso then return torso.Position end
-	local head = inst:FindFirstChild("Head")
-	if head then return head.Position end
-	local part = inst:FindFirstChildWhichIsA("BasePart")
-	if part then return part.Position end
-	return nil
-end
+local pinkSkyActive = false
+local pinkSkyObjects = {}
+local savedAtmosphere = nil
 
-local function getModelAdornee(inst)
-	local primary = inst.PrimaryPart
-	if primary then return primary end
-	local hrp = inst:FindFirstChild("HumanoidRootPart")
-	if hrp then return hrp end
-	local head = inst:FindFirstChild("Head")
-	if head then return head end
-	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
-	if torso then return torso end
-	return inst:FindFirstChildWhichIsA("BasePart")
-end
+local function applyPinkSky()
+	if pinkSkyActive then return end
+	pinkSkyActive = true
 
-local function isBodyBag(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	local n = string.lower(inst.Name)
-	return string.find(n, "bodybag", 1, true) ~= nil
-end
+	saveLighting()
 
-local function getOwnerName(inst)
-	local direct = inst:FindFirstChild("PlayerName")
-	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
-		return direct.Value
+	local existingAtm = Lighting:FindFirstChildOfClass("Atmosphere")
+	if existingAtm and existingAtm.Name ~= "QVIZI_PinkAtm" then
+		savedAtmosphere = existingAtm
+		existingAtm.Parent = nil
 	end
-	local ownerAttr = inst:GetAttribute("PlayerName")
-	if ownerAttr and type(ownerAttr) == "string" and ownerAttr ~= "" then
-		return ownerAttr
-	end
-	for _, d in ipairs(inst:GetChildren()) do
-		if d:IsA("StringValue") and d.Value ~= "" then
-			return d.Value
-		end
-		if d:IsA("ObjectValue") and d.Value then
-			return d.Value.Name
-		end
-	end
-	return nil
+
+	local sky = Instance.new("Sky")
+	sky.Name = "QVIZI_PinkSky"
+	sky.SkyboxBk = "rbxassetid://159454299"
+	sky.SkyboxDn = "rbxassetid://159454296"
+	sky.SkyboxFt = "rbxassetid://159454293"
+	sky.SkyboxLf = "rbxassetid://159454286"
+	sky.SkyboxRt = "rbxassetid://159454300"
+	sky.SkyboxUp = "rbxassetid://159454288"
+	sky.SunAngularSize = 0
+	sky.MoonAngularSize = 0
+	sky.StarCount = 3000
+	sky.Parent = Lighting
+	table.insert(pinkSkyObjects, sky)
+
+	local atm = Instance.new("Atmosphere")
+	atm.Name = "QVIZI_PinkAtm"
+	atm.Density = 0.32
+	atm.Offset = 0
+	atm.Color = Color3.fromRGB(255, 200, 225)
+	atm.Decay = Color3.fromRGB(160, 110, 160)
+	atm.Glare = 0.35
+	atm.Haze = 1.8
+	atm.Parent = Lighting
+	table.insert(pinkSkyObjects, atm)
+
+	local cc = Instance.new("ColorCorrectionEffect")
+	cc.Name = "QVIZI_PinkCC"
+	cc.Brightness = -0.02
+	cc.Contrast = 0.08
+	cc.Saturation = 0.1
+	cc.TintColor = Color3.fromRGB(255, 220, 240)
+	cc.Parent = Lighting
+	table.insert(pinkSkyObjects, cc)
+
+	local bloom = Instance.new("BloomEffect")
+	bloom.Name = "QVIZI_PinkBloom"
+	bloom.Intensity = 0.35
+	bloom.Size = 18
+	bloom.Threshold = 1.1
+	bloom.Parent = Lighting
+	table.insert(pinkSkyObjects, bloom)
+
+	Lighting.ClockTime = 18.2
+	Lighting.Brightness = 1.4
+	Lighting.Ambient = Color3.fromRGB(105, 85, 105)
+	Lighting.OutdoorAmbient = Color3.fromRGB(150, 115, 145)
+	Lighting.FogColor = Color3.fromRGB(220, 175, 200)
+	Lighting.FogEnd = 8000
+	Lighting.FogStart = 0
 end
 
-local function createESP(plr)
-	if plr == LP then return end
-	if espObjects[plr] then
+local function removePinkSky()
+	pinkSkyActive = false
+	for _, obj in ipairs(pinkSkyObjects) do
+		pcall(function() obj:Destroy() end)
+	end
+	pinkSkyObjects = {}
+	if savedAtmosphere then
 		pcall(function()
-			if espObjects[plr].bb then espObjects[plr].bb:Destroy() end
-			if espObjects[plr].highlight then espObjects[plr].highlight:Destroy() end
+			savedAtmosphere.Parent = Lighting
 		end)
-		espObjects[plr] = nil
+		savedAtmosphere = nil
 	end
-
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "QVIZI_ESP"
-	bb.Size = UDim2.new(0, 200, 0, 72)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
-	bb.AlwaysOnTop = true
-	bb.LightInfluence = 0
-	bb.MaxDistance = 5000
-	bb.Adornee = nil
-	bb.Enabled = false
-	bb.Parent = LP:WaitForChild("PlayerGui")
-
-	local nameLbl = Instance.new("TextLabel", bb)
-	nameLbl.Size = UDim2.new(1, 0, 0, 22)
-	nameLbl.Position = UDim2.new(0, 0, 0, 0)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = ""
-	nameLbl.TextColor3 = Config.ESPColor
-	nameLbl.Font = Enum.Font.GothamBold
-	nameLbl.TextSize = 16
-	nameLbl.TextStrokeTransparency = 0
-	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local hpLbl = Instance.new("TextLabel", bb)
-	hpLbl.Size = UDim2.new(1, 0, 0, 22)
-	hpLbl.Position = UDim2.new(0, 0, 0, 24)
-	hpLbl.BackgroundTransparency = 1
-	hpLbl.Text = ""
-	hpLbl.TextColor3 = Color3.fromRGB(0, 255, 80)
-	hpLbl.Font = Enum.Font.GothamBold
-	hpLbl.TextSize = 16
-	hpLbl.TextStrokeTransparency = 0
-	hpLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local distLbl = Instance.new("TextLabel", bb)
-	distLbl.Size = UDim2.new(1, 0, 0, 22)
-	distLbl.Position = UDim2.new(0, 0, 0, 48)
-	distLbl.BackgroundTransparency = 1
-	distLbl.Text = ""
-	distLbl.TextColor3 = Config.ESPColor
-	distLbl.Font = Enum.Font.GothamBold
-	distLbl.TextSize = 16
-	distLbl.TextStrokeTransparency = 0
-	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "QVIZI_HL"
-	highlight.FillColor = THEME.ACCENT
-	highlight.OutlineColor = THEME.ACCENT
-	highlight.FillTransparency = 0.6
-	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = nil
-	highlight.Enabled = false
-	highlight.Parent = LP:WaitForChild("PlayerGui")
-
-	espObjects[plr] = {
-		bb = bb,
-		name = nameLbl,
-		hp = hpLbl,
-		dist = distLbl,
-		highlight = highlight,
-	}
+	restoreLighting()
 end
 
-local function removeESP(plr)
-	if espObjects[plr] then
-		pcall(function() espObjects[plr].bb:Destroy() end)
-		pcall(function() espObjects[plr].highlight:Destroy() end)
-		espObjects[plr] = nil
-	end
-end
-
-registerCleanup(function()
-	for plr, _ in pairs(espObjects) do
-		removeESP(plr)
-	end
-end)
-
-Players.PlayerAdded:Connect(function(plr)
-	task.wait(0.5)
-	createESP(plr)
-end)
-
-for _, p in pairs(Players:GetPlayers()) do createESP(p) end
-
-Players.PlayerRemoving:Connect(removeESP)
-
-local function createBodyBagESP(inst)
-	if bodyBagObjects[inst] then return end
-	if not isBodyBag(inst) then return end
-
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "QVIZI_BodyBag"
-	bb.Size = UDim2.new(0, 200, 0, 50)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
-	bb.AlwaysOnTop = true
-	bb.LightInfluence = 0
-	bb.MaxDistance = 5000
-	bb.Enabled = false
-	bb.Parent = LP:WaitForChild("PlayerGui")
-
-	local ownerLbl = Instance.new("TextLabel", bb)
-	ownerLbl.Size = UDim2.new(1, 0, 0, 22)
-	ownerLbl.Position = UDim2.new(0, 0, 0, 0)
-	ownerLbl.BackgroundTransparency = 1
-	ownerLbl.Text = ""
-	ownerLbl.TextColor3 = Config.BodyBagColor
-	ownerLbl.Font = Enum.Font.GothamBold
-	ownerLbl.TextSize = 15
-	ownerLbl.TextStrokeTransparency = 0
-	ownerLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local distLbl = Instance.new("TextLabel", bb)
-	distLbl.Size = UDim2.new(1, 0, 0, 18)
-	distLbl.Position = UDim2.new(0, 0, 0, 24)
-	distLbl.BackgroundTransparency = 1
-	distLbl.Text = ""
-	distLbl.TextColor3 = Config.BodyBagColor
-	distLbl.Font = Enum.Font.GothamBold
-	distLbl.TextSize = 14
-	distLbl.TextStrokeTransparency = 0
-	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "QVIZI_BodyBagHL"
-	highlight.FillColor = Config.BodyBagColor
-	highlight.OutlineColor = Config.BodyBagColor
-	highlight.FillTransparency = 0.6
-	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = nil
-	highlight.Enabled = false
-	highlight.Parent = LP:WaitForChild("PlayerGui")
-
-	bodyBagObjects[inst] = {
-		bb = bb,
-		ownerLbl = ownerLbl,
-		distLbl = distLbl,
-		highlight = highlight,
-		cachedOwner = nil,
-		lastOwnerCheck = 0,
-	}
-end
-
-local function removeBodyBagESP(inst)
-	if bodyBagObjects[inst] then
-		pcall(function() bodyBagObjects[inst].bb:Destroy() end)
-		pcall(function() bodyBagObjects[inst].highlight:Destroy() end)
-		bodyBagObjects[inst] = nil
-	end
-end
-
-local function processBodyBag(inst)
-	if not Config.BodyBagESP then return end
-	if bodyBagObjects[inst] then return end
-	if not inst.Parent then return end
-	if not isBodyBag(inst) then return end
-	createBodyBagESP(inst)
-end
-
-local function scanBodyBags()
-	if not Config.BodyBagESP then return end
-	if bbScanState.running then return end
-	bbScanState.running = true
-
-	task.spawn(function()
-		pcall(function()
-			local children = workspace:GetChildren()
-			local batchSize = 50
-			local i = 1
-			while i <= #children do
-				if not Config.BodyBagESP then
-					bbScanState.running = false
-					return
-				end
-				local batchEnd = math.min(i + batchSize - 1, #children)
-				for j = i, batchEnd do
-					local child = children[j]
-					if isBodyBag(child) then
-						processBodyBag(child)
-					end
-				end
-				i = batchEnd + 1
-				task.wait()
-			end
-		end)
-		bbScanState.running = false
-	end)
-end
-
-_G.QVIZI_START_BB_SCAN = function()
-	if not Config.BodyBagESP then return end
-	scanBodyBags()
-end
-
-_G.QVIZI_CLEAR_BB = function()
-	for inst, _ in pairs(bodyBagObjects) do
-		removeBodyBagESP(inst)
-	end
-end
-
-local function isBaseClaim(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	return inst.Name == "Base Claim"
-end
-
-local function isWoodenCrate(inst)
-	if not inst or not inst:IsA("Model") then return false end
-	return inst.Name == "Wooden Crate"
-end
-
-local function isSulfurOre(inst)
-	if not inst then return false end
-	if inst:IsA("Model") then
-		return inst.Name == "Sulfur Ore"
-	end
-	if inst:IsA("BasePart") then
-		return inst.Name == "Sulfur Ore"
-	end
-	return false
-end
-
-local function isMetalOre(inst)
-	if not inst then return false end
-	if inst:IsA("Model") then
-		return inst.Name == "Metal Ore"
-	end
-	if inst:IsA("BasePart") then
-		return inst.Name == "Metal Ore"
-	end
-	return false
-end
-
-local function getOreAdornee(inst)
-	if inst:IsA("BasePart") then return inst end
-	if inst:IsA("Model") then
-		if inst.PrimaryPart then return inst.PrimaryPart end
-		local union = inst:FindFirstChild("Union")
-		if union and union:IsA("BasePart") then return union end
-		local top = inst:FindFirstChild("Top")
-		if top and top:IsA("BasePart") then return top end
-		return inst:FindFirstChildWhichIsA("BasePart")
-	end
-	return nil
-end
-
-local function makeDeployableESP(objectsTable, name, labelText, colorKey)
-	local function createFn(inst)
-		if objectsTable[inst] then return end
-		local bb = Instance.new("BillboardGui")
-		bb.Name = "QVIZI_" .. name
-		bb.Size = UDim2.new(0, 200, 0, 40)
-		bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
-		bb.AlwaysOnTop = true
-		bb.LightInfluence = 0
-		bb.MaxDistance = 5000
-		bb.Enabled = false
-		bb.Parent = LP:WaitForChild("PlayerGui")
-
-		local nameLbl = Instance.new("TextLabel", bb)
-		nameLbl.Size = UDim2.new(1, 0, 0, 22)
-		nameLbl.Position = UDim2.new(0, 0, 0, 0)
-		nameLbl.BackgroundTransparency = 1
-		nameLbl.Text = labelText
-		nameLbl.TextColor3 = Config[colorKey]
-		nameLbl.Font = Enum.Font.GothamBold
-		nameLbl.TextSize = 15
-		nameLbl.TextStrokeTransparency = 0
-		nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-		local distLbl = Instance.new("TextLabel", bb)
-		distLbl.Size = UDim2.new(1, 0, 0, 18)
-		distLbl.Position = UDim2.new(0, 0, 0, 24)
-		distLbl.BackgroundTransparency = 1
-		distLbl.Text = ""
-		distLbl.TextColor3 = Config[colorKey]
-		distLbl.Font = Enum.Font.GothamBold
-		distLbl.TextSize = 14
-		distLbl.TextStrokeTransparency = 0
-		distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "QVIZI_" .. name .. "HL"
-		highlight.FillColor = Config[colorKey]
-		highlight.OutlineColor = Config[colorKey]
-		highlight.FillTransparency = 0.6
-		highlight.OutlineTransparency = 0
-		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.Adornee = nil
-		highlight.Enabled = false
-		highlight.Parent = LP:WaitForChild("PlayerGui")
-
-		objectsTable[inst] = {
-			bb = bb,
-			nameLbl = nameLbl,
-			distLbl = distLbl,
-			highlight = highlight,
-		}
-	end
-
-	local function removeFn(inst)
-		if objectsTable[inst] then
-			pcall(function() objectsTable[inst].bb:Destroy() end)
-			pcall(function() objectsTable[inst].highlight:Destroy() end)
-			objectsTable[inst] = nil
-		end
-	end
-
-	return createFn, removeFn
-end
-
-local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim", "BaseClaimColor")
-local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate", "WoodenCrateColor")
-
-local function makeOreESP(inst, objectsTable, name, labelText, colorKey)
-	if objectsTable[inst] then return end
-	local adornee = getOreAdornee(inst)
-	if not adornee then return end
-
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "QVIZI_" .. name
-	bb.Size = UDim2.new(0, 200, 0, 40)
-	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
-	bb.AlwaysOnTop = true
-	bb.LightInfluence = 0
-	bb.MaxDistance = 5000
-	bb.Enabled = false
-	bb.Parent = LP:WaitForChild("PlayerGui")
-
-	local nameLbl = Instance.new("TextLabel", bb)
-	nameLbl.Size = UDim2.new(1, 0, 0, 22)
-	nameLbl.Position = UDim2.new(0, 0, 0, 0)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = labelText
-	nameLbl.TextColor3 = Config[colorKey]
-	nameLbl.Font = Enum.Font.GothamBold
-	nameLbl.TextSize = 15
-	nameLbl.TextStrokeTransparency = 0
-	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local distLbl = Instance.new("TextLabel", bb)
-	distLbl.Size = UDim2.new(1, 0, 0, 18)
-	distLbl.Position = UDim2.new(0, 0, 0, 24)
-	distLbl.BackgroundTransparency = 1
-	distLbl.Text = ""
-	distLbl.TextColor3 = Config[colorKey]
-	distLbl.Font = Enum.Font.GothamBold
-	distLbl.TextSize = 14
-	distLbl.TextStrokeTransparency = 0
-	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "QVIZI_" .. name .. "HL"
-	highlight.FillColor = Config[colorKey]
-	highlight.OutlineColor = Config[colorKey]
-	highlight.FillTransparency = 0.5
-	highlight.OutlineTransparency = 0
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.Adornee = inst
-	highlight.Enabled = false
-	highlight.Parent = LP:WaitForChild("PlayerGui")
-
-	objectsTable[inst] = {
-		bb = bb,
-		nameLbl = nameLbl,
-		distLbl = distLbl,
-		highlight = highlight,
-		adornee = adornee,
-	}
-end
-
-local function removeOreESP(inst, objectsTable)
-	if objectsTable[inst] then
-		pcall(function() objectsTable[inst].bb:Destroy() end)
-		pcall(function() objectsTable[inst].highlight:Destroy() end)
-		objectsTable[inst] = nil
-	end
-end
-
-local function scanOres()
-	local root = workspace:FindFirstChild("OreSpawns")
-	if not root then return end
-
-	for _, spawn in ipairs(root:GetChildren()) do
-		if spawn.Name == "OreSpawn" then
-			for _, child in ipairs(spawn:GetChildren()) do
-				if Config.SulfurOreESP and isSulfurOre(child) then
-					makeOreESP(child, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
-				end
-				if Config.MetalOreESP and isMetalOre(child) then
-					makeOreESP(child, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
-				end
-			end
-		end
-	end
-end
-
-_G.QVIZI_START_SO_SCAN = function()
-	if not Config.SulfurOreESP then return end
-	if soScanState.running then return end
-	soScanState.running = true
-	task.spawn(function()
-		pcall(scanOres)
-		soScanState.running = false
-	end)
-end
-
-_G.QVIZI_CLEAR_SO = function()
-	for part, _ in pairs(sulfurOreObjects) do
-		removeOreESP(part, sulfurOreObjects)
-	end
-end
-
-_G.QVIZI_START_MO_SCAN = function()
-	if not Config.MetalOreESP then return end
-	if moScanState.running then return end
-	moScanState.running = true
-	task.spawn(function()
-		pcall(scanOres)
-		moScanState.running = false
-	end)
-end
-
-_G.QVIZI_CLEAR_MO = function()
-	for part, _ in pairs(metalOreObjects) do
-		removeOreESP(part, metalOreObjects)
-	end
-end
-
-local oreRoot = workspace:FindFirstChild("OreSpawns")
-if oreRoot then
-	oreRoot.DescendantAdded:Connect(function(inst)
-		if Config.SulfurOreESP and isSulfurOre(inst) then
-			makeOreESP(inst, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
-		end
-		if Config.MetalOreESP and isMetalOre(inst) then
-			makeOreESP(inst, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
-		end
-	end)
-	oreRoot.DescendantRemoving:Connect(function(inst)
-		if sulfurOreObjects[inst] then
-			removeOreESP(inst, sulfurOreObjects)
-		end
-		if metalOreObjects[inst] then
-			removeOreESP(inst, metalOreObjects)
-		end
-	end)
-end
-
-local function scanDeployables(tbl, isTargetFn, createFn, state)
-	if not Config[tbl.enabledKey] then return end
-	if state.running then return end
-	state.running = true
-	task.spawn(function()
-		pcall(function()
-			local root = workspace:FindFirstChild("PlayerBuiltStructures")
-			if not root then
-				state.running = false
-				return
-			end
-			local deployables = root:FindFirstChild("Deployables")
-			if not deployables then
-				state.running = false
-				return
-			end
-			local children = deployables:GetChildren()
-			local batchSize = 30
-			local i = 1
-			while i <= #children do
-				if not Config[tbl.enabledKey] then
-					state.running = false
-					return
-				end
-				local batchEnd = math.min(i + batchSize - 1, #children)
-				for j = i, batchEnd do
-					local child = children[j]
-					if isTargetFn(child) then
-						if not tbl.objects[child] then
-							createFn(child)
-						end
-					end
-				end
-				i = batchEnd + 1
-				task.wait()
-			end
-		end)
-		state.running = false
-	end)
-end
-
-local baseClaimTbl = { objects = baseClaimObjects, enabledKey = "BaseClaimESP" }
-local woodenCrateTbl = { objects = woodenCrateObjects, enabledKey = "WoodenCrateESP" }
-
-_G.QVIZI_START_BC_SCAN = function()
-	if not Config.BaseClaimESP then return end
-	scanDeployables(baseClaimTbl, isBaseClaim, createBaseClaimESP, bcScanState)
-end
-
-_G.QVIZI_CLEAR_BC = function()
-	for inst, _ in pairs(baseClaimObjects) do
-		removeBaseClaimESP(inst)
-	end
-end
-
-_G.QVIZI_START_WC_SCAN = function()
-	if not Config.WoodenCrateESP then return end
-	scanDeployables(woodenCrateTbl, isWoodenCrate, createWoodenCrateESP, wcScanState)
-end
-
-_G.QVIZI_CLEAR_WC = function()
-	for inst, _ in pairs(woodenCrateObjects) do
-		removeWoodenCrateESP(inst)
-	end
-end
-
-registerCleanup(function()
-	for inst, _ in pairs(baseClaimObjects) do
-		removeBaseClaimESP(inst)
-	end
-	for inst, _ in pairs(woodenCrateObjects) do
-		removeWoodenCrateESP(inst)
-	end
-	for inst, _ in pairs(bodyBagObjects) do
-		removeBodyBagESP(inst)
-	end
-	for part, _ in pairs(sulfurOreObjects) do
-		removeOreESP(part, sulfurOreObjects)
-	end
-	for part, _ in pairs(metalOreObjects) do
-		removeOreESP(part, metalOreObjects)
-	end
-end)
-
-local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
-	if not inst:IsA("Model") then return end
-	local n = string.lower(inst.Name)
-	if Config.BodyBagESP and string.find(n, "bodybag", 1, true) then
-		task.defer(function()
-			if not Config.BodyBagESP then return end
-			processBodyBag(inst)
-		end)
-	end
-	if Config.BaseClaimESP and inst.Name == "Base Claim" then
-		task.defer(function()
-			if not Config.BaseClaimESP then return end
-			if not baseClaimObjects[inst] then
-				createBaseClaimESP(inst)
-			end
-		end)
-	end
-	if Config.WoodenCrateESP and inst.Name == "Wooden Crate" then
-		task.defer(function()
-			if not Config.WoodenCrateESP then return end
-			if not woodenCrateObjects[inst] then
-				createWoodenCrateESP(inst)
-			end
-		end)
-	end
-end)
-
-local descRemovedConn = workspace.DescendantRemoving:Connect(function(inst)
-	if bodyBagObjects[inst] then
-		removeBodyBagESP(inst)
-	end
-	if baseClaimObjects[inst] then
-		removeBaseClaimESP(inst)
-	end
-	if woodenCrateObjects[inst] then
-		removeWoodenCrateESP(inst)
-	end
-end)
-
-registerCleanup(function()
-	if descAddedConn then descAddedConn:Disconnect() end    if descRemovedConn then descRemovedConn:Disconnect() end
-end)
-
-local function isVisible(targetChar)
-	if not targetChar then return false end
-	local head = targetChar:FindFirstChild("Head")
-	if not head then return false end
-	local origin = Camera.CFrame.Position
-	local dir = head.Position - origin
-	local params = RaycastParams.new()
-	local filter = {}
-	if LP.Character then table.insert(filter, LP.Character) end
-	params.FilterDescendantsInstances = filter
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local result = workspace:Raycast(origin, dir, params)
-	return result == nil
-end
-
-local function getAimPart(char)
-	local part = char:FindFirstChild(Config.AimPart)
-	if part then return part end
-	if Config.AimPart == "UpperTorso" or Config.AimPart == "LowerTorso" then
-		return char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart")
-	end
-	return char:FindFirstChild("HumanoidRootPart")
-end
-
-local function isSameTeam(plr)
-	if not Config.AimTeamCheck then return false end
-	if not plr.Team or not LP.Team then return false end
-	return plr.Team == LP.Team
-end
-
-local function getAimTarget()
-	local closest = nil
-	local shortest = math.huge
-	local fovPx = Config.AimFOV
-	local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= LP and plr.Character then
-			local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-			if hum and hum.Health > 0 and not isSameTeam(plr) then
-				local part = getAimPart(plr.Character)
-				if part then
-					local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-					if onScreen then
-						local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-						if dist < shortest and dist <= fovPx then
-							if (not Config.AimVisibleCheck) or isVisible(plr.Character) then
-								shortest = dist
-								closest = part
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	return closest
-end
-
-RunService:BindToRenderStep("QVIZI_AIM", Enum.RenderPriority.Camera.Value + 1, function()
-	if not Config.Aimbot then return end
-	local target = getAimTarget()
-	if not target then return end
-	local smooth = math.clamp(1 - (Config.AimSmooth / 100), 0.01, 1)
-	local currentCF = Camera.CFrame
-	local targetCF = CFrame.new(currentCF.Position, target.Position)
-	Camera.CFrame = currentCF:Lerp(targetCF, smooth)
-end)
-
-registerCleanup(function()
-	pcall(function()
-		RunService:UnbindFromRenderStep("QVIZI_AIM")
-	end)
-end)
+registerCleanup(removePinkSky)
 
 local function createMenu()
 	local existing = LP.PlayerGui:FindFirstChild("QVIZIHUB")
@@ -969,7 +500,6 @@ local function createMenu()
 	gui.Name = "QVIZIHUB"
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 10000
 	gui.Parent = LP:WaitForChild("PlayerGui")
 
 	local openBtn = Instance.new("TextButton", gui)
@@ -1397,6 +927,7 @@ local function createMenu()
 	makeToggle(espPage, "Chams (Fill Body)", 220, "ESPChams")
 	makeToggle(espPage, "Rainbow Mode", 264, "ESPRainbow")
 	makeSlider(espPage, "Max Distance", 314, 1, 10000, "ESPMaxDist", "m")
+
 	local espColorBox, espPicker = makeColorPicker(espPage, 378, "ESPColor", "ESP Color")
 
 	task.spawn(function()
@@ -1561,6 +1092,7 @@ local function createMenu()
 	farmPage.CanvasSize = UDim2.new(0, 0, 0, 1700)
 
 	local setPage = pages["Settings"]
+	makeToggle(setPage, "Enable Intro", 0, "IntroEnabled")
 
 	local timeLbl = Instance.new("TextLabel", setPage)
 	timeLbl.Size = UDim2.new(1, -10, 0, 30)
@@ -1570,11 +1102,16 @@ local function createMenu()
 	timeLbl.Font = Enum.Font.GothamBold
 	timeLbl.TextSize = 14
 	timeLbl.TextXAlignment = Enum.TextXAlignment.Left
-	timeLbl.Position = UDim2.new(0, 0, 0, 0)
+	timeLbl.Position = UDim2.new(0, 0, 0, 46)
 
 	local timeBtns = {}
 
 	local function applyTime(mode)
+		if mode == "Pink" then
+			applyPinkSky()
+			return
+		end
+		removePinkSky()
 		if mode == "Day" then
 			Lighting.ClockTime = 14
 			Lighting.Brightness = 2
@@ -1623,15 +1160,16 @@ local function createMenu()
 		return b
 	end
 
-	makeTimeBtn("Day", 0, 36, "Day")
-	makeTimeBtn("Night", 138, 36, "Night")
-	makeTimeBtn("Fog", 276, 36, "Fog")
+	makeTimeBtn("Day", 0, 82, "Day")
+	makeTimeBtn("Night", 138, 82, "Night")
+	makeTimeBtn("Fog", 276, 82, "Fog")
+	makeTimeBtn("Pink Sky", 414, 82, "Pink")
 
 	applyTime(Config.TimeMode)
 
 	local resetBtn = Instance.new("TextButton", setPage)
 	resetBtn.Size = UDim2.new(1, -10, 0, 38)
-	resetBtn.Position = UDim2.new(0, 0, 0, 84)
+	resetBtn.Position = UDim2.new(0, 0, 0, 130)
 	resetBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 110)
 	resetBtn.Text = "Reset Config"
 	resetBtn.TextColor3 = Color3.new(1, 1, 1)
@@ -1661,6 +1199,7 @@ local function createMenu()
 		Config.SpeedEnabled = false
 		Config.SpeedValue = 50
 		Config.InfJump = false
+		Config.IntroEnabled = true
 		Config.BodyBagESP = false
 		Config.BodyBagOwner = true
 		Config.BodyBagDistance = true
@@ -2051,6 +1590,741 @@ local function createMenu()
 	return gui
 end
 
+local espObjects = {}
+
+local function createESP(plr)
+	if plr == LP then return end
+	if espObjects[plr] then
+		pcall(function()
+			if espObjects[plr].bb then espObjects[plr].bb:Destroy() end
+			if espObjects[plr].highlight then espObjects[plr].highlight:Destroy() end
+		end)
+		espObjects[plr] = nil
+	end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_ESP"
+	bb.Size = UDim2.new(0, 200, 0, 72)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Adornee = nil
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local nameLbl = Instance.new("TextLabel", bb)
+	nameLbl.Size = UDim2.new(1, 0, 0, 22)
+	nameLbl.Position = UDim2.new(0, 0, 0, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = ""
+	nameLbl.TextColor3 = Config.ESPColor
+	nameLbl.Font = Enum.Font.GothamBold
+	nameLbl.TextSize = 16
+	nameLbl.TextStrokeTransparency = 0
+	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local hpLbl = Instance.new("TextLabel", bb)
+	hpLbl.Size = UDim2.new(1, 0, 0, 22)
+	hpLbl.Position = UDim2.new(0, 0, 0, 24)
+	hpLbl.BackgroundTransparency = 1
+	hpLbl.Text = ""
+	hpLbl.TextColor3 = Color3.fromRGB(0, 255, 80)
+	hpLbl.Font = Enum.Font.GothamBold
+	hpLbl.TextSize = 16
+	hpLbl.TextStrokeTransparency = 0
+	hpLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 22)
+	distLbl.Position = UDim2.new(0, 0, 0, 48)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Config.ESPColor
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 16
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_HL"
+	highlight.FillColor = THEME.ACCENT
+	highlight.OutlineColor = THEME.ACCENT
+	highlight.FillTransparency = 0.6
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = nil
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	espObjects[plr] = {
+		bb = bb,
+		name = nameLbl,
+		hp = hpLbl,
+		dist = distLbl,
+		highlight = highlight,
+	}
+end
+
+local function removeESP(plr)
+	if espObjects[plr] then
+		pcall(function() espObjects[plr].bb:Destroy() end)
+		pcall(function() espObjects[plr].highlight:Destroy() end)
+		espObjects[plr] = nil
+	end
+end
+
+registerCleanup(function()
+	for plr, _ in pairs(espObjects) do
+		removeESP(plr)
+	end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	task.wait(0.5)
+	createESP(plr)
+end)
+
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+
+Players.PlayerRemoving:Connect(removeESP)
+
+local function getModelPosition(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary.Position end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp.Position end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso.Position end
+	local head = inst:FindFirstChild("Head")
+	if head then return head.Position end
+	local part = inst:FindFirstChildWhichIsA("BasePart")
+	if part then return part.Position end
+	return nil
+end
+
+local function getModelAdornee(inst)
+	local primary = inst.PrimaryPart
+	if primary then return primary end
+	local hrp = inst:FindFirstChild("HumanoidRootPart")
+	if hrp then return hrp end
+	local head = inst:FindFirstChild("Head")
+	if head then return head end
+	local torso = inst:FindFirstChild("Torso") or inst:FindFirstChild("UpperTorso")
+	if torso then return torso end
+	return inst:FindFirstChildWhichIsA("BasePart")
+end
+
+local bodyBagObjects = {}
+
+local function isBodyBag(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	local n = string.lower(inst.Name)
+	return string.find(n, "bodybag", 1, true) ~= nil
+end
+
+local function getOwnerName(inst)
+	local direct = inst:FindFirstChild("PlayerName")
+	if direct and direct:IsA("StringValue") and direct.Value ~= "" then
+		return direct.Value
+	end
+	local ownerAttr = inst:GetAttribute("PlayerName")
+	if ownerAttr and type(ownerAttr) == "string" and ownerAttr ~= "" then
+		return ownerAttr
+	end
+	for _, d in ipairs(inst:GetChildren()) do
+		if d:IsA("StringValue") and d.Value ~= "" then
+			return d.Value
+		end
+		if d:IsA("ObjectValue") and d.Value then
+			return d.Value.Name
+		end
+	end
+	return nil
+end
+
+local function createBodyBagESP(inst)
+	if bodyBagObjects[inst] then return end
+	if not isBodyBag(inst) then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_BodyBag"
+	bb.Size = UDim2.new(0, 200, 0, 50)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local ownerLbl = Instance.new("TextLabel", bb)
+	ownerLbl.Size = UDim2.new(1, 0, 0, 22)
+	ownerLbl.Position = UDim2.new(0, 0, 0, 0)
+	ownerLbl.BackgroundTransparency = 1
+	ownerLbl.Text = ""
+	ownerLbl.TextColor3 = Config.BodyBagColor
+	ownerLbl.Font = Enum.Font.GothamBold
+	ownerLbl.TextSize = 15
+	ownerLbl.TextStrokeTransparency = 0
+	ownerLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 18)
+	distLbl.Position = UDim2.new(0, 0, 0, 24)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Config.BodyBagColor
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 14
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_BodyBagHL"
+	highlight.FillColor = Config.BodyBagColor
+	highlight.OutlineColor = Config.BodyBagColor
+	highlight.FillTransparency = 0.6
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = nil
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	bodyBagObjects[inst] = {
+		bb = bb,
+		ownerLbl = ownerLbl,
+		distLbl = distLbl,
+		highlight = highlight,
+		cachedOwner = nil,
+		lastOwnerCheck = 0,
+	}
+end
+
+local function removeBodyBagESP(inst)
+	if bodyBagObjects[inst] then
+		pcall(function() bodyBagObjects[inst].bb:Destroy() end)
+		pcall(function() bodyBagObjects[inst].highlight:Destroy() end)
+		bodyBagObjects[inst] = nil
+	end
+end
+
+local bbScanState = { running = false }
+
+local function processBodyBag(inst)
+	if not Config.BodyBagESP then return end
+	if bodyBagObjects[inst] then return end
+	if not inst.Parent then return end
+	if not isBodyBag(inst) then return end
+	createBodyBagESP(inst)
+end
+
+local function scanBodyBags()
+	if not Config.BodyBagESP then return end
+	if bbScanState.running then return end
+	bbScanState.running = true
+
+	task.spawn(function()
+		pcall(function()
+			local children = workspace:GetChildren()
+			local batchSize = 50
+			local i = 1
+			while i <= #children do
+				if not Config.BodyBagESP then
+					bbScanState.running = false
+					return
+				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isBodyBag(child) then
+						processBodyBag(child)
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
+			end
+		end)
+		bbScanState.running = false
+	end)
+end
+
+_G.QVIZI_START_BB_SCAN = function()
+	if not Config.BodyBagESP then return end
+	scanBodyBags()
+end
+
+_G.QVIZI_CLEAR_BB = function()
+	for inst, _ in pairs(bodyBagObjects) do
+		removeBodyBagESP(inst)
+	end
+end
+
+local baseClaimObjects = {}
+local woodenCrateObjects = {}
+
+local function isBaseClaim(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Base Claim"
+end
+
+local function isWoodenCrate(inst)
+	if not inst or not inst:IsA("Model") then return false end
+	return inst.Name == "Wooden Crate"
+end
+
+local function makeDeployableESP(objectsTable, name, labelText, colorKey)
+	local function createFn(inst)
+		if objectsTable[inst] then return end
+		local bb = Instance.new("BillboardGui")
+		bb.Name = "QVIZI_" .. name
+		bb.Size = UDim2.new(0, 200, 0, 40)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+		bb.AlwaysOnTop = true
+		bb.LightInfluence = 0
+		bb.MaxDistance = 5000
+		bb.Enabled = false
+		bb.Parent = LP:WaitForChild("PlayerGui")
+
+		local nameLbl = Instance.new("TextLabel", bb)
+		nameLbl.Size = UDim2.new(1, 0, 0, 22)
+		nameLbl.Position = UDim2.new(0, 0, 0, 0)
+		nameLbl.BackgroundTransparency = 1
+		nameLbl.Text = labelText
+		nameLbl.TextColor3 = Config[colorKey]
+		nameLbl.Font = Enum.Font.GothamBold
+		nameLbl.TextSize = 15
+		nameLbl.TextStrokeTransparency = 0
+		nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local distLbl = Instance.new("TextLabel", bb)
+		distLbl.Size = UDim2.new(1, 0, 0, 18)
+		distLbl.Position = UDim2.new(0, 0, 0, 24)
+		distLbl.BackgroundTransparency = 1
+		distLbl.Text = ""
+		distLbl.TextColor3 = Config[colorKey]
+		distLbl.Font = Enum.Font.GothamBold
+		distLbl.TextSize = 14
+		distLbl.TextStrokeTransparency = 0
+		distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "QVIZI_" .. name .. "HL"
+		highlight.FillColor = Config[colorKey]
+		highlight.OutlineColor = Config[colorKey]
+		highlight.FillTransparency = 0.6
+		highlight.OutlineTransparency = 0
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Adornee = nil
+		highlight.Enabled = false
+		highlight.Parent = LP:WaitForChild("PlayerGui")
+
+		objectsTable[inst] = {
+			bb = bb,
+			nameLbl = nameLbl,
+			distLbl = distLbl,
+			highlight = highlight,
+		}
+	end
+
+	local function removeFn(inst)
+		if objectsTable[inst] then
+			pcall(function() objectsTable[inst].bb:Destroy() end)
+			pcall(function() objectsTable[inst].highlight:Destroy() end)
+			objectsTable[inst] = nil
+		end
+	end
+
+	return createFn, removeFn
+end
+
+local createBaseClaimESP, removeBaseClaimESP = makeDeployableESP(baseClaimObjects, "BaseClaim", "Base Claim", "BaseClaimColor")
+local createWoodenCrateESP, removeWoodenCrateESP = makeDeployableESP(woodenCrateObjects, "WoodenCrate", "Wooden Crate", "WoodenCrateColor")
+
+local sulfurOreObjects = {}
+local metalOreObjects = {}
+
+local bcScanState = { running = false }
+local wcScanState = { running = false }
+local soScanState = { running = false }
+local moScanState = { running = false }
+
+-- ==== ИСПРАВЛЕНО: принимаем и Model, и BasePart ====
+local function isSulfurOre(inst)
+	if not inst then return false end
+	if inst:IsA("Model") then
+		return inst.Name == "Sulfur Ore"
+	end
+	if inst:IsA("BasePart") then
+		return inst.Name == "Sulfur Ore"
+	end
+	return false
+end
+
+local function isMetalOre(inst)
+	if not inst then return false end
+	if inst:IsA("Model") then
+		return inst.Name == "Metal Ore"
+	end
+	if inst:IsA("BasePart") then
+		return inst.Name == "Metal Ore"
+	end
+	return false
+end
+
+local function getOreAdornee(inst)
+	if inst:IsA("BasePart") then return inst end
+	if inst:IsA("Model") then
+		if inst.PrimaryPart then return inst.PrimaryPart end
+		local union = inst:FindFirstChild("Union")
+		if union and union:IsA("BasePart") then return union end
+		local top = inst:FindFirstChild("Top")
+		if top and top:IsA("BasePart") then return top end
+		return inst:FindFirstChildWhichIsA("BasePart")
+	end
+	return nil
+end
+
+local function makeOreESP(inst, objectsTable, name, labelText, colorKey)
+	if objectsTable[inst] then return end
+	local adornee = getOreAdornee(inst)
+	if not adornee then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "QVIZI_" .. name
+	bb.Size = UDim2.new(0, 200, 0, 40)
+	bb.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 5000
+	bb.Enabled = false
+	bb.Parent = LP:WaitForChild("PlayerGui")
+
+	local nameLbl = Instance.new("TextLabel", bb)
+	nameLbl.Size = UDim2.new(1, 0, 0, 22)
+	nameLbl.Position = UDim2.new(0, 0, 0, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = labelText
+	nameLbl.TextColor3 = Config[colorKey]
+	nameLbl.Font = Enum.Font.GothamBold
+	nameLbl.TextSize = 15
+	nameLbl.TextStrokeTransparency = 0
+	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local distLbl = Instance.new("TextLabel", bb)
+	distLbl.Size = UDim2.new(1, 0, 0, 18)
+	distLbl.Position = UDim2.new(0, 0, 0, 24)
+	distLbl.BackgroundTransparency = 1
+	distLbl.Text = ""
+	distLbl.TextColor3 = Config[colorKey]
+	distLbl.Font = Enum.Font.GothamBold
+	distLbl.TextSize = 14
+	distLbl.TextStrokeTransparency = 0
+	distLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "QVIZI_" .. name .. "HL"
+	highlight.FillColor = Config[colorKey]
+	highlight.OutlineColor = Config[colorKey]
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = inst
+	highlight.Enabled = false
+	highlight.Parent = LP:WaitForChild("PlayerGui")
+
+	objectsTable[inst] = {
+		bb = bb,
+		nameLbl = nameLbl,
+		distLbl = distLbl,
+		highlight = highlight,
+		adornee = adornee,
+	}
+end
+
+local function removeOreESP(inst, objectsTable)
+	if objectsTable[inst] then
+		pcall(function() objectsTable[inst].bb:Destroy() end)
+		pcall(function() objectsTable[inst].highlight:Destroy() end)
+		objectsTable[inst] = nil
+	end
+end
+
+local function scanOres()
+	local root = workspace:FindFirstChild("OreSpawns")
+	if not root then return end
+
+	for _, spawn in ipairs(root:GetChildren()) do
+		if spawn.Name == "OreSpawn" then
+			for _, child in ipairs(spawn:GetChildren()) do
+				if Config.SulfurOreESP and isSulfurOre(child) then
+					makeOreESP(child, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+				end
+				if Config.MetalOreESP and isMetalOre(child) then
+					makeOreESP(child, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
+				end
+			end
+		end
+	end
+end
+
+_G.QVIZI_START_SO_SCAN = function()
+	if not Config.SulfurOreESP then return end
+	if soScanState.running then return end
+	soScanState.running = true
+	task.spawn(function()
+		pcall(scanOres)
+		soScanState.running = false
+	end)
+end
+
+_G.QVIZI_CLEAR_SO = function()
+	for part, _ in pairs(sulfurOreObjects) do
+		removeOreESP(part, sulfurOreObjects)
+	end
+end
+
+_G.QVIZI_START_MO_SCAN = function()
+	if not Config.MetalOreESP then return end
+	if moScanState.running then return end
+	moScanState.running = true
+	task.spawn(function()
+		pcall(scanOres)
+		moScanState.running = false
+	end)
+end
+
+_G.QVIZI_CLEAR_MO = function()
+	for part, _ in pairs(metalOreObjects) do
+		removeOreESP(part, metalOreObjects)
+	end
+end
+
+local oreRoot = workspace:FindFirstChild("OreSpawns")
+if oreRoot then
+	oreRoot.DescendantAdded:Connect(function(inst)
+		-- ==== ИСПРАВЛЕНО: без проверки IsA("BasePart") ====
+		if Config.SulfurOreESP and isSulfurOre(inst) then
+			makeOreESP(inst, sulfurOreObjects, "SulfurOre", "Sulfur Ore", "SulfurOreColor")
+		end
+		if Config.MetalOreESP and isMetalOre(inst) then
+			makeOreESP(inst, metalOreObjects, "MetalOre", "Metal Ore", "MetalOreColor")
+		end
+	end)
+	oreRoot.DescendantRemoving:Connect(function(inst)
+		if sulfurOreObjects[inst] then
+			removeOreESP(inst, sulfurOreObjects)
+		end
+		if metalOreObjects[inst] then
+			removeOreESP(inst, metalOreObjects)
+		end
+	end)
+end
+
+local function scanDeployables(tbl, isTargetFn, createFn, state)
+	if not Config[tbl.enabledKey] then return end
+	if state.running then return end
+	state.running = true
+	task.spawn(function()
+		pcall(function()
+			local root = workspace:FindFirstChild("PlayerBuiltStructures")
+			if not root then
+				state.running = false
+				return
+			end
+			local deployables = root:FindFirstChild("Deployables")
+			if not deployables then
+				state.running = false
+				return
+			end
+			local children = deployables:GetChildren()
+			local batchSize = 30
+			local i = 1
+			while i <= #children do
+				if not Config[tbl.enabledKey] then
+					state.running = false
+					return
+				end
+				local batchEnd = math.min(i + batchSize - 1, #children)
+				for j = i, batchEnd do
+					local child = children[j]
+					if isTargetFn(child) then
+						if not tbl.objects[child] then
+							createFn(child)
+						end
+					end
+				end
+				i = batchEnd + 1
+				task.wait()
+			end
+		end)
+		state.running = false
+	end)
+end
+
+local baseClaimTbl = { objects = baseClaimObjects, enabledKey = "BaseClaimESP" }
+local woodenCrateTbl = { objects = woodenCrateObjects, enabledKey = "WoodenCrateESP" }
+
+_G.QVIZI_START_BC_SCAN = function()
+	if not Config.BaseClaimESP then return end
+	scanDeployables(baseClaimTbl, isBaseClaim, createBaseClaimESP, bcScanState)
+end
+
+_G.QVIZI_CLEAR_BC = function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+end
+
+_G.QVIZI_START_WC_SCAN = function()
+	if not Config.WoodenCrateESP then return end
+	scanDeployables(woodenCrateTbl, isWoodenCrate, createWoodenCrateESP, wcScanState)
+end
+
+_G.QVIZI_CLEAR_WC = function()
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+end
+
+registerCleanup(function()
+	for inst, _ in pairs(baseClaimObjects) do
+		removeBaseClaimESP(inst)
+	end
+	for inst, _ in pairs(woodenCrateObjects) do
+		removeWoodenCrateESP(inst)
+	end
+	for inst, _ in pairs(bodyBagObjects) do
+		removeBodyBagESP(inst)
+	end
+	for part, _ in pairs(sulfurOreObjects) do
+		removeOreESP(part, sulfurOreObjects)
+	end
+	for part, _ in pairs(metalOreObjects) do
+		removeOreESP(part, metalOreObjects)
+	end
+end)
+
+local descAddedConn = workspace.DescendantAdded:Connect(function(inst)
+	if not inst:IsA("Model") then return end
+	local n = string.lower(inst.Name)
+	if Config.BodyBagESP and string.find(n, "bodybag", 1, true) then
+		task.defer(function()
+			if not Config.BodyBagESP then return end
+			processBodyBag(inst)
+		end)
+	end
+	if Config.BaseClaimESP and inst.Name == "Base Claim" then
+		task.defer(function()
+			if not Config.BaseClaimESP then return end
+			if not baseClaimObjects[inst] then
+				createBaseClaimESP(inst)
+			end
+		end)
+	end
+	if Config.WoodenCrateESP and inst.Name == "Wooden Crate" then
+		task.defer(function()
+			if not Config.WoodenCrateESP then return end
+			if not woodenCrateObjects[inst] then
+				createWoodenCrateESP(inst)
+			end
+		end)
+	end
+end)
+
+local descRemovedConn = workspace.DescendantRemoving:Connect(function(inst)
+	if bodyBagObjects[inst] then
+		removeBodyBagESP(inst)
+	end
+	if baseClaimObjects[inst] then
+		removeBaseClaimESP(inst)
+	end
+	if woodenCrateObjects[inst] then
+		removeWoodenCrateESP(inst)
+	end
+end)
+
+registerCleanup(function()
+	if descAddedConn then descAddedConn:Disconnect() end
+	if descRemovedConn then descRemovedConn:Disconnect() end
+end)
+
+local function isVisible(targetChar)
+	if not targetChar then return false end
+	local head = targetChar:FindFirstChild("Head")
+	if not head then return false end
+	local origin = Camera.CFrame.Position
+	local dir = head.Position - origin
+	local params = RaycastParams.new()
+	local filter = {}
+	if LP.Character then table.insert(filter, LP.Character) end
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then table.insert(filter, p.Character) end
+	end
+	params.FilterDescendantsInstances = filter
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local result = workspace:Raycast(origin, dir, params)
+	return result == nil
+end
+
+local function getAimPart(char)
+	local part = char:FindFirstChild(Config.AimPart)
+	if part then return part end
+	if Config.AimPart == "UpperTorso" or Config.AimPart == "LowerTorso" then
+		return char:FindFirstChild("Torso") or char:FindFirstChild("HumanoidRootPart")
+	end
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function isSameTeam(plr)
+	if not Config.AimTeamCheck then return false end
+	if not plr.Team or not LP.Team then return false end
+	return plr.Team == LP.Team
+end
+
+local function getAimTarget()
+	local closest = nil
+	local shortest = math.huge
+	local fovPx = Config.AimFOV
+	local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LP and plr.Character then
+			local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 and not isSameTeam(plr) then
+				local part = getAimPart(plr.Character)
+				if part then
+					local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+					if onScreen then
+						local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+						if dist < shortest and dist <= fovPx then
+							if (not Config.AimVisibleCheck) or isVisible(plr.Character) then
+								shortest = dist
+								closest = part
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return closest
+end
+
+RunService:BindToRenderStep("QVIZI_AIM", Enum.RenderPriority.Camera.Value + 1, function()
+	if not Config.Aimbot then return end
+	local target = getAimTarget()
+	if not target then return end
+	local smooth = math.clamp(1 - (Config.AimSmooth / 100), 0.01, 1)
+	local currentCF = Camera.CFrame
+	local targetCF = CFrame.new(currentCF.Position, target.Position)
+	Camera.CFrame = currentCF:Lerp(targetCF, smooth)
+end)
+
+registerCleanup(function()
+	pcall(function()
+		RunService:UnbindFromRenderStep("QVIZI_AIM")
+	end)
+end)
+
 local oreCheckAccum = 0
 local oreCheckInterval = 1.5
 
@@ -2292,6 +2566,7 @@ local renderConn = RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 
+	-- ==== ИСПРАВЛЕНО: руды используют objs.adornee ====
 	for inst, objs in pairs(sulfurOreObjects) do
 		if not inst.Parent then
 			removeOreESP(inst, sulfurOreObjects)
@@ -2446,6 +2721,7 @@ end)
 
 task.spawn(function()
 	if Config.IntroEnabled then
+		playIntro()
 	end
 	task.wait(0.2)
 	createMenu()
